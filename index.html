@@ -293,10 +293,26 @@ textarea.inp{resize:vertical; min-height:60px}
 
 <!-- ============ 材料 ============ -->
 <div class="screen" id="screen-mat">
-  <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="margin-bottom:12px">
-  <div class="mat-wrap">
-    <div class="mat-nav" id="matNav"></div>
-    <div class="mat-list" id="matList"></div>
+  <div class="seg" id="matModeSeg" style="margin-bottom:10px">
+    <button class="on" onclick="setMatMode('list')">點收清單</button>
+    <button onclick="setMatMode('orders')">材料訂單</button>
+  </div>
+  <div id="matListView">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="flex:1">
+      <button class="btn sm" onclick="openOrderForm()">🛒 下單</button>
+    </div>
+    <div class="mat-wrap">
+      <div class="mat-nav" id="matNav"></div>
+      <div class="mat-list" id="matList"></div>
+    </div>
+  </div>
+  <div id="matOrdersView" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px">
+      <div style="font-weight:800;font-size:17px">材料訂單</div>
+      <button class="btn sm" onclick="openOrderForm()">＋ 新增訂單</button>
+    </div>
+    <div id="ordersList"></div>
   </div>
 </div>
 
@@ -395,7 +411,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
+let view = { tab:'log', calcMode:'area', matCat:'frame', matMode:'list', progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -519,7 +535,7 @@ function switchTab(t){
     document.getElementById('screen-'+x).classList.toggle('active', x===t);
     document.getElementById('tab-'+x).classList.toggle('on', x===t);
   });
-  if(t==='mat') renderMat();
+  if(t==='mat') setMatMode(view.matMode||'list');
   if(t==='prog') renderProg();
 }
 
@@ -910,6 +926,89 @@ function setSpec(name,sid,field,v){
 }
 function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
 function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
+
+/* ===== 購物車下單 / 材料訂單 ===== */
+function ordStore(){ if(!state.orders)state.orders={}; const sid=state.activeSiteId; if(!state.orders[sid])state.orders[sid]=[]; return state.orders[sid]; }
+function allItemNames(){ const s=matStore(); const names=[]; MAT_CATS.forEach(c=>c.items.forEach(it=>names.push(it.name))); s.customItems.forEach(ci=>names.push(ci.name)); return [...new Set(names)]; }
+function setMatMode(m){
+  view.matMode=m;
+  document.getElementById('matListView').style.display = m==='orders'?'none':'block';
+  document.getElementById('matOrdersView').style.display = m==='orders'?'block':'none';
+  const segs=document.querySelectorAll('#matModeSeg button'); if(segs[0])segs[0].classList.toggle('on',m!=='orders'); if(segs[1])segs[1].classList.toggle('on',m==='orders');
+  if(m==='orders') renderOrders(); else renderMat();
+}
+let _order=null;
+function openOrderForm(id){
+  const editing=id?ordStore().find(o=>o.id===id):null;
+  _order = editing
+    ? {id:editing.id, date:editing.date, location:editing.location||'', note:editing.note||'', lines:editing.lines.map(l=>({...l})), editId:id}
+    : {id:uid(), date:todayStr(), location:activeSite().name, note:'', lines:[{name:'',spec:'',qty:'',unit:''}], editId:null};
+  showOrderModal();
+}
+function orderLineRow(l,i){
+  const opts=['<option value="">選擇品項</option>',...allItemNames().map(n=>`<option${n===l.name?' selected':''}>${esc(n)}</option>`)].join('');
+  return `<div class="rec-item">
+    <div class="ri-top"><select class="inp" onchange="_order.lines[${i}].name=this.value;_order.lines[${i}].unit=(getMatDef(this.value).unit||'')">${opts}</select><button class="del" onclick="ordDelLine(${i})">🗑</button></div>
+    <div class="row">
+      <label class="fld" style="margin-bottom:6px"><span>規格</span><input class="inp" value="${esc(l.spec)}" onchange="_order.lines[${i}].spec=this.value" placeholder="如 75mm×3m"></label>
+      <label class="fld" style="margin-bottom:6px"><span>數量</span><input class="inp" type="number" inputmode="decimal" value="${l.qty}" onchange="_order.lines[${i}].qty=(this.value===''?'':+this.value)"></label>
+    </div>
+  </div>`;
+}
+function showOrderModal(){
+  const lines=_order.lines.map((l,i)=>orderLineRow(l,i)).join('');
+  openModal(`<h3>${_order.editId?'編輯':'新增'}材料訂單 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
+    <label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_order.date)}" onchange="_order.date=this.value"></label>
+    <label class="fld"><span>送貨地點</span><input class="inp" value="${esc(_order.location)}" onchange="_order.location=this.value" placeholder="送到哪"></label>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin:8px 2px 4px">品項</div>
+    <div id="ordLines">${lines}</div>
+    <button class="btn ghost sm full" style="margin:4px 0 12px" onclick="ordAddLine()">＋ 品項</button>
+    <label class="fld"><span>備註</span><textarea class="inp" onchange="_order.note=this.value" placeholder="補充…">${esc(_order.note)}</textarea></label>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;font-weight:600"><input type="checkbox" id="ordSync" checked style="width:18px;height:18px"> 下單數量自動帶入「已訂」</label>
+    <button class="btn full" onclick="saveOrder()">儲存訂單</button>`);
+}
+function ordAddLine(){ _order.lines.push({name:'',spec:'',qty:'',unit:''}); showOrderModal(); }
+function ordDelLine(i){ _order.lines.splice(i,1); if(!_order.lines.length)_order.lines.push({name:'',spec:'',qty:'',unit:''}); showOrderModal(); }
+function saveOrder(){
+  const lines=_order.lines.filter(l=>l.name);
+  if(!lines.length) return toast('請至少加一個品項');
+  lines.forEach(l=>{ if(!l.unit) l.unit=getMatDef(l.name).unit||''; });
+  const sync=document.getElementById('ordSync').checked;
+  const o={id:_order.id, date:_order.date||todayStr(), location:_order.location||'', note:_order.note||'', lines};
+  const store=ordStore();
+  const idx=_order.editId?store.findIndex(x=>x.id===_order.editId):-1;
+  if(idx>=0) store[idx]=o; else store.push(o);
+  if(sync){
+    lines.forEach(l=>{ const qty=+l.qty||0; if(!qty)return; const it=matItem(l.name);
+      let sp=it.specs.find(s=>(s.label||'')===(l.spec||'')); if(!sp){ sp={id:uid(),label:l.spec||'',ordered:0,actual:'',checked:false}; it.specs.push(sp); }
+      sp.ordered=(+sp.ordered||0)+qty; });
+  }
+  saveState(); closeModal(); setMatMode('orders'); toast(sync?'訂單已存，數量已帶入已訂':'訂單已儲存');
+}
+function renderOrders(){
+  const list=ordStore();
+  const box=document.getElementById('ordersList');
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有材料訂單<br>點「＋ 新增訂單」或在點收清單按「🛒 下單」</div>`; return; }
+  box.innerHTML=list.slice().reverse().map(o=>{
+    const lines=o.lines.map(l=>`<div class="rc-line"><b>${esc(l.name)}</b> <span class="muted">${esc(l.spec||'')}</span> <span class="rc-pct">${esc(String(l.qty))}${esc(l.unit||'')}</span></div>`).join('');
+    return `<div class="log-card">
+      <div class="lc-top"><div style="font-weight:700">${esc(o.date)} ｜ ${esc(o.location||'-')}</div><button class="btn green sm" onclick="shareOrder('${o.id}')">LINE</button></div>
+      <div class="rc-items">${lines}</div>
+      ${o.note?`<div class="lc-meta">${esc(o.note)}</div>`:''}
+      <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openOrderForm('${o.id}')">編輯</button><button class="btn gray sm" onclick="delOrder('${o.id}')">刪除</button></div>
+    </div>`;
+  }).join('');
+}
+function delOrder(id){ if(!confirm('刪除此訂單？'))return; state.orders[state.activeSiteId]=ordStore().filter(o=>o.id!==id); saveState(); renderOrders(); }
+function orderLineText(o){ const lines=o.lines.map(l=>`・${l.name}${l.spec?' '+l.spec:''} ×${l.qty}${l.unit||''}`).join('\n'); return `【材料訂單】${activeSite().name}\n【日期】${o.date}\n【送貨地點】${o.location||'-'}\n${lines}${o.note?'\n【備註】'+o.note:''}`; }
+async function shareOrder(id){
+  const o=ordStore().find(x=>x.id===id); if(!o)return;
+  const txt=orderLineText(o);
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  if(navigator.share){ try{ await navigator.share({text:txt}); return; }catch(e){ if(e.name==='AbortError')return; } }
+  toast('已複製，貼到 LINE 群組即可');
+}
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
 function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
