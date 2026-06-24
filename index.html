@@ -29,17 +29,16 @@ input,select,textarea{font-family:inherit; font-size:16px} /* 16px 防 iOS 放�
 .topbar{
   position:sticky; top:0; z-index:50; background:rgba(255,255,255,.92);
   backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
-  border-bottom:1px solid var(--border); padding:10px 14px;
+  border-bottom:1px solid var(--border); padding:10px 14px 8px;
   padding-top:calc(10px + env(safe-area-inset-top,0px));
-  display:flex; align-items:center; gap:8px;
 }
+.tb-row1{display:flex; align-items:center; justify-content:space-between; gap:8px}
 .topbar .logo{font-weight:800; font-size:17px; white-space:nowrap}
 .topbar .logo small{color:var(--blue)}
-.site-sel{flex:1; display:flex; align-items:center; gap:6px; min-width:0}
-.site-sel select{
-  flex:1; min-width:0; background:var(--inp); border:1px solid var(--border); border-radius:10px;
-  padding:8px 10px; color:var(--text); font-weight:600; font-size:15px;
-}
+.site-chips{display:flex; gap:8px; overflow-x:auto; margin-top:9px; padding-bottom:2px; -webkit-overflow-scrolling:touch; scrollbar-width:none}
+.site-chips::-webkit-scrollbar{display:none}
+.site-chip{flex:none; padding:7px 16px; border-radius:999px; border:1.5px solid var(--border); background:var(--card); color:var(--text2); font-weight:700; font-size:14px; white-space:nowrap}
+.site-chip.on{background:var(--text); color:var(--card); border-color:var(--text)}
 .icon-btn{
   width:36px; height:36px; border-radius:10px; background:var(--inp); border:1px solid var(--border);
   display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--blue); flex:none;
@@ -211,9 +210,11 @@ textarea.inp{resize:vertical; min-height:60px}
 .ps-meta{font-size:13px; color:var(--text2); font-weight:600; display:flex; align-items:center; gap:5px; white-space:nowrap}
 .ps-meta b{color:var(--text); font-size:15px}
 .ps-caret{color:var(--text2); font-size:12px}
-.thin-bar{height:8px; border-radius:999px; background:var(--inp); overflow:hidden; margin:8px 0}
-.thin-fill{height:100%; border-radius:999px; background:var(--blue); transition:width .15s}
+.thin-bar{position:relative; height:14px; border-radius:6px; background:var(--inp); overflow:hidden; margin:8px 0}
+.thin-fill{height:100%; background:var(--blue); transition:width .15s}
 .thin-fill.full{background:var(--green)}
+.thin-bar::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 2px), var(--bg) calc(10% - 2px), var(--bg) 10%)}
 .floor-pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
 .floor-pill{font-size:13px; font-weight:700; padding:7px 13px; border-radius:999px; border:1.5px solid var(--border)}
 .floor-pill.zero{color:var(--text2); background:var(--inp); opacity:.65}
@@ -270,13 +271,15 @@ textarea.inp{resize:vertical; min-height:60px}
 <body>
 
 <div class="topbar">
-  <div class="logo">泰郡<small>工務系統</small></div>
-  <div class="site-sel">
-    <select id="siteSelect" onchange="onSiteChange()"></select>
-    <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
-    <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
+  <div class="tb-row1">
+    <div class="logo">泰郡<small>工務系統</small></div>
+    <div style="display:flex;gap:6px">
+      <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
+      <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
+      <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
+    </div>
   </div>
-  <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
+  <div class="site-chips" id="siteChips"></div>
 </div>
 
 <!-- ============ 日誌 ============ -->
@@ -520,11 +523,11 @@ function openModal(html){ document.getElementById('modalBox').innerHTML=html; do
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
 
 /* =================== 案場 =================== */
-function renderSiteSelect(){
-  const sel=document.getElementById('siteSelect');
-  sel.innerHTML=state.sites.map(s=>`<option value="${s.id}"${s.id===state.activeSiteId?' selected':''}>${esc(s.name)}</option>`).join('');
+function renderSiteChips(){
+  const el=document.getElementById('siteChips');
+  el.innerHTML=state.sites.map(s=>`<button class="site-chip${s.id===state.activeSiteId?' on':''}" onclick="switchSite('${s.id}')">${esc(s.name)}</button>`).join('');
 }
-function onSiteChange(){ state.activeSiteId=document.getElementById('siteSelect').value; saveState(); renderAll(); }
+function switchSite(id){ state.activeSiteId=id; saveState(); renderAll(); }
 function addSite(){
   openModal(`<h3>新增案場 <span class="x" onclick="closeModal()">×</span></h3>
     <label class="fld"><span>案場名稱</span><input class="inp" id="newSiteName" placeholder="例：青年安心住宅"></label>
@@ -1247,7 +1250,7 @@ function registerSW(){
 }
 
 /* =================== init =================== */
-function renderAll(){ renderSiteSelect(); renderCalendar(); renderDay(); renderProg(); renderMat(); }
+function renderAll(){ renderSiteChips(); renderCalendar(); renderDay(); renderProg(); renderMat(); }
 function init(){ setupPWA(); registerSW(); matPointerInit(); renderAll(); }
 init();
 </script>
