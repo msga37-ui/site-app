@@ -372,7 +372,7 @@ const MAT_CATS = [
     {name:'鋁企口', unit:'片', presets:[]},
     {name:'PVC', unit:'片', presets:[]},
   ]},
-  {key:'extra', name:'副資材與耗材', items:[
+  {key:'extra', name:'其他材料', items:[
     {name:'岩棉', unit:'包', presets:['60x120','60x100']},
     {name:'玻璃棉', unit:'包', presets:[]},
     {name:'護角', unit:'支', presets:[]},
@@ -437,6 +437,8 @@ function migrateState(s){
   s.attendance= s.attendance|| [];
   s.progress  = s.progress  || {};
   s.materials = s.materials || {};
+  // 一次性：把已存在目錄裡的「副資材與耗材」改名為「其他材料」
+  if(!s._extraRenamed){ Object.values(s.catalog||{}).forEach(cats=>{ const c=(cats||[]).find(x=>x.name==='副資材與耗材'); if(c)c.name='其他材料'; }); s._extraRenamed=true; }
   // 進度舊格式 {item,floor,percent} → {work,floor,percent,vendor}
   Object.keys(s.progress).forEach(sid=>{
     s.progress[sid]=(s.progress[sid]||[]).map(p=> (p.work!==undefined) ? p
@@ -824,7 +826,7 @@ function catalogStore(){
     const m=state.materials[sid];
     if(m){
       const known=new Set(); cats.forEach(c=>c.items.forEach(i=>known.add(i.name)));
-      const catName={frame:'隔間/天花骨架',board:'板材類',extra:'副資材與耗材'};
+      const catName={frame:'隔間/天花骨架',board:'板材類',extra:'其他材料'};
       (m.customItems||[]).forEach(ci=>{ if(known.has(ci.name))return; let cat=cats.find(c=>c.name===catName[ci.cat])||cats[cats.length-1]; cat.items.push({id:uid(),name:ci.name,unit:ci.unit||'',perBox:ci.perBox||null,presets:(ci.presets||[]).slice()}); known.add(ci.name); });
       Object.keys(m.items||{}).forEach(nm=>{ if(known.has(nm))return; cats[cats.length-1].items.push({id:uid(),name:nm,unit:'',perBox:(m.items[nm].perBox||null),presets:[]}); known.add(nm); });
     }
