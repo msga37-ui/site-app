@@ -215,6 +215,7 @@ textarea.inp{resize:vertical; min-height:60px}
     <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
     <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
   </div>
+  <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
 </div>
 
 <!-- ============ 日誌 ============ -->
@@ -372,6 +373,9 @@ function photoDB(){
 async function photoPut(id, blob, meta){ const db=await photoDB(); return new Promise((res,rej)=>{ const tx=db.transaction('photos','readwrite'); tx.objectStore('photos').put({id,blob,meta}); tx.oncomplete=()=>res(id); tx.onerror=rej; }); }
 async function photoGet(id){ const db=await photoDB(); return new Promise((res,rej)=>{ const r=db.transaction('photos').objectStore('photos').get(id); r.onsuccess=()=>res(r.result); r.onerror=rej; }); }
 async function photoDel(id){ const db=await photoDB(); return new Promise((res,rej)=>{ const tx=db.transaction('photos','readwrite'); tx.objectStore('photos').delete(id); tx.oncomplete=()=>res(); tx.onerror=rej; }); }
+async function photoGetAll(){ const db=await photoDB(); return new Promise((res,rej)=>{ const r=db.transaction('photos').objectStore('photos').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=rej; }); }
+function blobToDataURL(b){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(b); }); }
+function dataURLtoBlob(d){ const i=d.indexOf(','); const mime=(d.slice(0,i).match(/:(.*?);/)||[])[1]||'image/jpeg'; const bin=atob(d.slice(i+1)); const u=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k); return new Blob([u],{type:mime}); }
 
 /* =================== UI helper =================== */
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
@@ -691,6 +695,50 @@ function setSpec(name,sid,field,v){
 }
 function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
 function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
+
+/* =================== 設定／備份還原 =================== */
+function openSettings(){
+  openModal(`<h3>設定／備份 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:14px">資料只存在這支手機。建議定期備份，存到手機「檔案」或傳到 LINE Keep 保管，換手機或意外時可一鍵還原。</div>
+    <button class="btn full" style="margin-bottom:10px" onclick="exportBackup()">⬇️ 匯出備份（所有資料＋照片）</button>
+    <label class="btn ghost full" style="margin-bottom:16px">⬆️ 還原備份（選擇備份檔）
+      <input type="file" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
+    </label>
+    <div class="warn" style="margin-top:0">
+      ⚠️ 請<b>不要刪除主畫面的「工」圖示</b> —— 刪除會清掉手機上的資料。<br>
+      更新版本會自動進行，不需要也不要刪圖示。
+    </div>`);
+}
+async function exportBackup(){
+  toast('正在打包備份…');
+  let photos=[];
+  try{ const all=await photoGetAll(); for(const p of all){ if(p&&p.blob){ photos.push({id:p.id, meta:p.meta||null, data:await blobToDataURL(p.blob)}); } } }catch(e){}
+  const backup={ app:'工地管理員', version:1, exportedAt:new Date().toISOString(), state, photos };
+  const fname=`工地備份_${todayStr()}.json`;
+  const file=new File([JSON.stringify(backup)], fname, {type:'application/json'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:'工地管理員備份'}); return; }catch(e){ if(e.name==='AbortError') return; }
+  }
+  const url=URL.createObjectURL(file);
+  const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('已匯出備份檔');
+}
+async function importBackup(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  let backup;
+  try{ backup=JSON.parse(await file.text()); }catch(e){ input.value=''; return toast('檔案讀取失敗'); }
+  if(!backup || !backup.state || !backup.state.sites || !backup.state.sites.length){ input.value=''; return toast('這不是有效的備份檔'); }
+  input.value='';
+  if(!confirm('還原會「覆蓋」目前 App 內的所有資料，確定要還原嗎？')) return;
+  state=backup.state; saveState();
+  if(!state.sites.find(s=>s.id===state.activeSiteId)) state.activeSiteId=state.sites[0].id;
+  if(backup.photos && backup.photos.length){
+    toast('正在還原照片…');
+    for(const p of backup.photos){ try{ if(p.data) await photoPut(p.id, dataURLtoBlob(p.data), p.meta||{}); }catch(e){} }
+  }
+  saveState(); closeModal(); renderAll(); toast('✅ 已還原備份');
+}
 
 /* =================== PWA manifest（inline，免額外檔） =================== */
 function setupPWA(){
