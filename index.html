@@ -282,8 +282,8 @@ textarea.inp{resize:vertical; min-height:60px}
   <div id="progSummary"></div>
   <div style="display:flex;align-items:center;margin:4px 2px 12px;gap:8px">
     <div class="seg" id="progViewSeg" style="flex:1;margin:0">
-      <button data-v="work" class="on" onclick="setProgView('work')">依工項</button>
-      <button data-v="floor" onclick="setProgView('floor')">依樓層</button>
+      <button data-v="work" onclick="setProgView('work')">依工項</button>
+      <button data-v="floor" class="on" onclick="setProgView('floor')">依樓層</button>
     </div>
     <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
     <button class="btn sm" onclick="openProgAdd()">＋</button>
@@ -395,7 +395,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{}, progView:'work', floorExpanded:{},
+let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
