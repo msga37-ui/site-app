@@ -39,6 +39,9 @@ input,select,textarea{font-family:inherit; font-size:16px} /* 16px 防 iOS 放�
 .site-chips::-webkit-scrollbar{display:none}
 .site-chip{flex:none; padding:7px 16px; border-radius:999px; border:1.5px solid var(--border); background:var(--card); color:var(--text2); font-weight:700; font-size:14px; white-space:nowrap}
 .site-chip.on{background:var(--text); color:var(--card); border-color:var(--text)}
+.form-site-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+.site-chip.sm{padding:7px 14px; font-size:13px}
+.site-chip.addchip{color:var(--blue); border-style:dashed; border-color:var(--blue); background:transparent}
 .icon-btn{
   width:36px; height:36px; border-radius:10px; background:var(--inp); border:1px solid var(--border);
   display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--blue); flex:none;
@@ -657,13 +660,13 @@ let _origPhotoIds=[];    // 編輯前已存在的照片 id
 let _rec=null;           // 目前編輯中的記錄/出勤暫存
 
 function newEntry(){
-  _rec={ type:'record', date:view.selDate, vendor:vendorList()[0]||'',
+  _rec={ type:'record', siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate, vendor:vendorList()[0]||'',
     items:[{work:'',floor:'',percent:0,headcount:''}], note:'', attendSites:[], editId:null };
   _origPhotoIds=[]; _logPhotos=[]; showRecordModal();
 }
 function openRecordForm(id){
   const r=recStore().find(x=>x.id===id); if(!r)return;
-  _rec={ type:'record', date:r.date, vendor:r.vendor||'',
+  _rec={ type:'record', siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:r.date, vendor:r.vendor||'',
     items:(r.items||[]).map(it=>{ const p=progById(it.progressId)||{}; return {progressId:it.progressId, work:p.work||'', floor:p.floor||'', percent:p.percent||0, headcount:(it.headcount===0?0:(it.headcount||''))}; }),
     note:r.note||'', attendSites:[], editId:id };
   if(!_rec.items.length) _rec.items=[{work:'',floor:'',percent:0,headcount:''}];
@@ -673,8 +676,12 @@ function openRecordForm(id){
 }
 function openAttendForm(id){
   const a=(state.attendance||[]).find(x=>x.id===id);
-  _rec={ type:'attend', date:a?a.date:view.selDate, vendor:'', items:[], note:'', attendSites:a?(a.sites||[]).slice():[state.activeSiteId], editId:id };
+  _rec={ type:'attend', siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:a?a.date:view.selDate, vendor:'', items:[], note:'', attendSites:a?(a.sites||[]).slice():[state.activeSiteId], editId:id };
   _origPhotoIds=[]; _logPhotos=[]; showRecordModal();
+}
+function addSiteFromForm(){
+  const n=(prompt('新增案場名稱：')||'').trim(); if(!n)return;
+  const id=uid(); state.sites.push({id,name:n}); state.activeSiteId=id; _rec.siteId=id; saveState(); renderSiteChips(); showRecordModal();
 }
 function recItemRow(it,i){
   const opts=['<option value="">選擇工項</option>',...workList().map(w=>`<option${w===it.work?' selected':''}>${esc(w)}</option>`)].join('');
@@ -695,10 +702,15 @@ function recItemRow(it,i){
 function showRecordModal(){
   const isRec=_rec.type==='record';
   let body;
+  const siteChips=`<label class="fld"><span>案場</span></label>
+    <div class="form-site-chips">
+      ${state.sites.map(s=>`<button type="button" class="site-chip sm${s.id===_rec.siteId?' on':''}" onclick="_rec.siteId='${s.id}';showRecordModal()">${esc(s.name)}</button>`).join('')}
+      <button type="button" class="site-chip sm addchip" onclick="addSiteFromForm()">＋ 案場</button>
+    </div>`;
   if(isRec){
     const vOpts=['<option value="">（未選廠商）</option>',...vendorList().map(v=>`<option${v===_rec.vendor?' selected':''}>${esc(v)}</option>`)].join('');
     const itemsHtml=_rec.items.map((it,i)=>recItemRow(it,i)).join('');
-    body=`<label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_rec.date)}" onchange="_rec.date=this.value"></label>
+    body=`${siteChips}<label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_rec.date)}" onchange="_rec.date=this.value"></label>
       <label class="fld"><span>施工廠商</span>
         <div style="display:flex;gap:8px"><select class="inp" onchange="_rec.vendor=this.value">${vOpts}</select><button class="icon-btn" onclick="openVendorManage()" title="管理廠商">⚙</button></div>
       </label>
@@ -720,7 +732,6 @@ function showRecordModal(){
       <button class="${!isRec?'on':''}" onclick="_rec.type='attend';showRecordModal()">出勤</button></div>`;
   openModal(`<h3>${_rec.editId?'編輯':'新增'}${isRec?'記錄':'出勤'} <span class="x" onclick="closeModal()">×</span></h3>
     ${toggle}
-    <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
     ${body}
     <button class="btn full" onclick="saveEntry()">儲存</button>`);
   if(isRec) renderLogPhotoStrip();
@@ -774,6 +785,12 @@ async function saveEntry(){
   }
   const valid=_rec.items.filter(it=>it.work);
   if(!valid.length) return toast('請至少選一個工項');
+  // 切換到目標案場（表單裡選的），記錄/進度就存到那個案場
+  const target=_rec.siteId||state.activeSiteId;
+  if(_rec.editId && _rec.origSiteId && _rec.origSiteId!==target && state.records[_rec.origSiteId]){
+    state.records[_rec.origSiteId]=state.records[_rec.origSiteId].filter(r=>r.id!==_rec.editId); // 從原案場移除
+  }
+  state.activeSiteId=target;
   for(const p of _logPhotos){ if(p.blob){ try{ await photoPut(p.id,p.blob,{date:_rec.date}); }catch(e){} } }
   const photos=_logPhotos.map(p=>p.id);
   for(const oid of _origPhotoIds){ if(!photos.includes(oid)){ try{ await photoDel(oid); }catch(e){} } }
@@ -786,7 +803,7 @@ async function saveEntry(){
   const store=recStore();
   const idx=_rec.editId?store.findIndex(r=>r.id===_rec.editId):-1;
   if(idx>=0) store[idx]=rec; else store.push(rec);
-  view.selDate=rec.date; saveState(); closeModal(); renderCalendar(); renderDay(); toast('記錄已儲存');
+  view.selDate=rec.date; saveState(); closeModal(); renderAll(); toast('記錄已儲存');
 }
 function delRecord(id){
   if(!confirm('刪除此筆記錄？'))return;
