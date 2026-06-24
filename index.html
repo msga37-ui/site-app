@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>工地管理員</title>
+<title>泰郡工務系統</title>
 <meta name="theme-color" content="#007AFF">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="工地管理員">
+<meta name="apple-mobile-web-app-title" content="泰郡工務系統">
 <style>
 :root{
   --blue:#007AFF; --green:#34C759; --orange:#FF9500; --red:#FF3B30; --purple:#AF52DE;
@@ -170,6 +170,27 @@ textarea.inp{resize:vertical; min-height:60px}
 .photo-strip .thumb{position:relative; width:74px; height:74px; border-radius:10px; overflow:hidden; border:1px solid var(--border)}
 .photo-strip .thumb img{width:100%; height:100%; object-fit:cover; display:block}
 .photo-strip .thumb-x{position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center}
+.custom-tag{font-size:10px; background:rgba(0,122,255,.12); color:var(--blue); padding:1px 6px; border-radius:999px; font-weight:700; vertical-align:middle}
+
+/* ===== 工項進度 ===== */
+.prog-group{padding:14px 14px 12px}
+.pg-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+.pg-title{font-weight:800; font-size:16px}
+.pg-avg{display:flex; align-items:center; gap:6px}
+.pg-avgnum{font-weight:800; font-size:16px; color:var(--blue)}
+.prog-row{padding:9px 0 4px; border-top:1px solid var(--border)}
+.prog-row:first-of-type{border-top:none}
+.prog-rowtop{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.prog-floor{font-weight:600; font-size:14px; flex:1}
+.prog-pct{font-weight:800; font-size:14px; color:var(--text2)}
+.prog-bar{height:9px; border-radius:999px; background:var(--inp); overflow:hidden}
+.prog-fill{height:100%; border-radius:999px; background:var(--blue); transition:width .15s}
+.prog-fill.full{background:var(--green)}
+.prog-slider{width:100%; margin:6px 0 0; accent-color:var(--blue)}
+.done-tags{display:flex; flex-wrap:wrap; gap:7px; margin-top:10px}
+.done-tag{display:inline-flex; align-items:center; gap:4px; background:rgba(52,199,89,.15); color:#1a8c3a; font-weight:700; font-size:13px; padding:6px 11px; border-radius:999px}
+.done-tag b{color:var(--red); font-size:15px; padding:0 2px; cursor:pointer}
+.del{font-size:15px; padding:2px 6px; background:none; opacity:.7}
 
 /* ===== 算料 ===== */
 .seg{display:flex; background:var(--inp); border-radius:10px; padding:3px; margin-bottom:12px}
@@ -209,7 +230,7 @@ textarea.inp{resize:vertical; min-height:60px}
 <body>
 
 <div class="topbar">
-  <div class="logo">工地<small>管理員</small></div>
+  <div class="logo">泰郡<small>工務系統</small></div>
   <div class="site-sel">
     <select id="siteSelect" onchange="onSiteChange()"></select>
     <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
@@ -241,6 +262,18 @@ textarea.inp{resize:vertical; min-height:60px}
   <div id="dayLogs"></div>
 </div>
 
+<!-- ============ 進度 ============ -->
+<div class="screen" id="screen-prog">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px">
+    <div style="font-weight:800;font-size:17px">工項進度</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
+      <button class="btn sm" onclick="openProgGroupForm()">＋ 工項</button>
+    </div>
+  </div>
+  <div id="progList"></div>
+</div>
+
 <!-- ============ 材料 ============ -->
 <div class="screen" id="screen-mat">
   <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="margin-bottom:12px">
@@ -250,9 +283,10 @@ textarea.inp{resize:vertical; min-height:60px}
   </div>
 </div>
 
-<!-- 底部 tab（算料計算機已暫時移除） -->
+<!-- 底部 tab -->
 <div class="tabbar">
   <button id="tab-log" class="on" onclick="switchTab('log')"><span class="ic">📅</span>日誌</button>
+  <button id="tab-prog" onclick="switchTab('prog')"><span class="ic">📊</span>進度</button>
   <button id="tab-mat" onclick="switchTab('mat')"><span class="ic">📦</span>材料</button>
 </div>
 
@@ -344,7 +378,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:'frame',
+let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -422,11 +456,12 @@ function delSite(){
 /* =================== Tab =================== */
 function switchTab(t){
   view.tab=t;
-  ['log','mat'].forEach(x=>{
+  ['log','prog','mat'].forEach(x=>{
     document.getElementById('screen-'+x).classList.toggle('active', x===t);
     document.getElementById('tab-'+x).classList.toggle('on', x===t);
   });
   if(t==='mat') renderMat();
+  if(t==='prog') renderProg();
 }
 
 /* =================== 月曆 =================== */
@@ -594,8 +629,8 @@ async function shareLine(id){
 function matStore(){
   const sid=state.activeSiteId;
   let m=state.materials[sid];
-  if(!m){ m=state.materials[sid]={items:{}}; return m; }
-  if(!m.items){ // 舊格式 {ordered,actual,checked} → 自動轉新格式
+  if(!m){ m=state.materials[sid]={items:{}, customItems:[]}; }
+  else if(!m.items){ // 舊格式 {ordered,actual,checked} → 自動轉新格式
     const old=m, items={};
     const names=new Set([...Object.keys(old.ordered||{}),...Object.keys(old.actual||{}),...Object.keys(old.checked||{})]);
     names.forEach(nm=>{
@@ -607,29 +642,59 @@ function matStore(){
         actual:(old.actual&&old.actual[nm]!=null)?old.actual[nm]:'',
         checked:!!(old.checked&&old.checked[nm])});
     });
-    m=state.materials[sid]={items};
+    m=state.materials[sid]={items, customItems:[]};
   }
+  if(!m.customItems) m.customItems=[];
   return m;
 }
+function getMatDef(name){ return MAT_DEF[name] || matStore().customItems.find(c=>c.name===name) || {unit:'',presets:[]}; }
 function matItem(name){
   const m=matStore();
-  if(!m.items[name]){ const def=MAT_DEF[name]||{}; m.items[name]={perBox:(def.perBox||null), specs:[]}; }
+  if(!m.items[name]){ const def=getMatDef(name); m.items[name]={perBox:(def.perBox||null), specs:[]}; }
   return m.items[name];
 }
 function f2(n){ return Math.round((+n||0)*100)/100; }
+function openAddCustomMat(cat){
+  openModal(`<h3>新增自訂材料 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:12px">新增的材料只會出現在<b>目前案場</b>。</div>
+    <label class="fld"><span>材料名稱</span><input class="inp" id="cmName" placeholder="例：白膠"></label>
+    <label class="fld"><span>計量單位</span>
+      <select class="inp" id="cmUnit"><option>支</option><option>片</option><option>包</option><option>箱</option><option>個</option><option>桶</option><option>捲</option><option>組</option><option>才</option></select>
+    </label>
+    <label class="fld"><span>每箱支數（箱裝才填，否則留空）</span><input class="inp" id="cmPerBox" type="number" inputmode="numeric" placeholder="留空＝非箱裝"></label>
+    <button class="btn full" onclick="addCustomItem('${cat}')">新增</button>`);
+}
+function addCustomItem(cat){
+  const name=(document.getElementById('cmName').value||'').trim();
+  if(!name) return toast('請輸入材料名稱');
+  const m=matStore();
+  if(MAT_DEF[name]||m.customItems.find(c=>c.name===name)) return toast('已有同名材料');
+  const unit=document.getElementById('cmUnit').value;
+  const pb=parseFloat(document.getElementById('cmPerBox').value)||null;
+  m.customItems.push({name, unit, perBox:pb, presets:[], cat, custom:true});
+  saveState(); closeModal(); renderMat(); toast('已新增自訂材料');
+}
+function delCustomItem(name){
+  if(!confirm('刪除自訂材料「'+name+'」？已填的數量也會一併移除。'))return;
+  const m=matStore();
+  m.customItems=m.customItems.filter(c=>c.name!==name);
+  delete m.items[name];
+  saveState(); renderMat();
+}
 
 function renderMat(){
   const nav=document.getElementById('matNav');
   nav.innerHTML=MAT_CATS.map(c=>`<button class="${c.key===view.matCat?'on':''}" onclick="view.matCat='${c.key}';renderMat()">${esc(c.name)}</button>`).join('');
   const q=document.getElementById('matSearch').value.trim();
   const store=matStore();
-  const catalog=new Set(Object.keys(MAT_DEF));
+  const customNames=store.customItems.map(c=>c.name);
+  const catalog=new Set([...Object.keys(MAT_DEF), ...customNames]);
   const orphans=Object.keys(store.items).filter(n=>!catalog.has(n)); // 舊資料殘留的非清單品項
   let cats = q ? MAT_CATS : MAT_CATS.filter(c=>c.key===view.matCat);
   nav.style.opacity = q ? .4 : 1;
   let html='';
   cats.forEach(c=>{
-    let names=c.items.map(it=>it.name);
+    let names=[...c.items.map(it=>it.name), ...store.customItems.filter(ci=>ci.cat===c.key).map(ci=>ci.name)];
     if(c.key==='extra') names=[...names,...orphans];
     let groupHtml='';
     names.forEach(name=>{
@@ -640,14 +705,15 @@ function renderMat(){
       }
       groupHtml+=renderMatGroup(name);
     });
-    if(!groupHtml) return;
+    if(q && !groupHtml) return;
     if(q) html+=`<div class="muted" style="font-weight:700;margin:10px 2px 2px">${esc(c.name)}</div>`;
     html+=groupHtml;
+    if(!q) html+=`<button class="btn ghost sm" style="margin:10px 2px 4px" onclick="openAddCustomMat('${c.key}')">＋ 新增自訂材料</button>`;
   });
   document.getElementById('matList').innerHTML=html||`<div class="empty">查無品項</div>`;
 }
 function renderMatGroup(name){
-  const def=MAT_DEF[name]||{unit:'',presets:[]};
+  const def=getMatDef(name);
   const grp=matStore().items[name];
   const specs=grp?grp.specs:[];
   const perBox = grp ? grp.perBox : (def.perBox||null);
@@ -679,8 +745,9 @@ function renderMatGroup(name){
   });
   const chips=(def.presets||[]).map(p=>`<button class="preset-chip" onclick="addSpec('${esc(name)}','${esc(p)}')">＋${esc(p)}</button>`).join('')
     + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂</button>`;
+  const delBtn = def.custom ? `<button class="del" onclick="delCustomItem('${esc(name)}')" title="刪除自訂材料">🗑</button>` : '';
   return `<div class="mat-group">
-    <div class="mg-head"><div class="t">${esc(name)} <small>${esc(unit)}</small></div>${boxCfg}</div>
+    <div class="mg-head"><div class="t">${esc(name)} <small>${esc(unit)}</small>${def.custom?' <span class="custom-tag">自訂</span>':''}</div><div style="display:flex;align-items:center;gap:6px">${boxCfg}${delBtn}</div></div>
     ${rows}
     <div class="presets">${chips}</div>
   </div>`;
@@ -696,6 +763,96 @@ function setSpec(name,sid,field,v){
 function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
 function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
 
+/* =================== 工項進度 =================== */
+function progStore(){
+  if(!state.progress) state.progress={};
+  const sid=state.activeSiteId;
+  if(!state.progress[sid]) state.progress[sid]=[];
+  return state.progress[sid];
+}
+function toggleProgEdit(){
+  view.progEdit=!view.progEdit;
+  const b=document.getElementById('progEditBtn');
+  b.textContent=view.progEdit?'完成':'編輯'; b.classList.toggle('green',view.progEdit);
+  renderProg();
+}
+function renderProg(){
+  const rows=progStore();
+  const box=document.getElementById('progList');
+  if(!rows.length){ box.innerHTML=`<div class="empty">還沒有工項進度<br>點右上「＋ 工項」新增施工項目</div>`; return; }
+  const groups={}, order=[];
+  rows.forEach(r=>{ if(!groups[r.item]){ groups[r.item]=[]; order.push(r.item); } groups[r.item].push(r); });
+  let html='';
+  order.forEach(item=>{
+    const list=groups[item];
+    const avg=Math.round(list.reduce((t,r)=>t+(+r.percent||0),0)/list.length);
+    const active=[], done=[];
+    list.forEach(r=>{ ((+r.percent||0)>=100 && !view.progExpanded[r.id]) ? done.push(r) : active.push(r); });
+    let bars='';
+    active.forEach(r=>{
+      const p=Math.max(0,Math.min(100,+r.percent||0));
+      bars+=`<div class="prog-row">
+        <div class="prog-rowtop">
+          <span class="prog-floor">${esc(r.floor)}</span>
+          <span class="prog-pct" id="pct-${r.id}">${p}%</span>
+          ${view.progEdit?`<button class="del" onclick="delProg('${r.id}')">🗑</button>`:''}
+        </div>
+        <div class="prog-bar"><div class="prog-fill${p>=100?' full':''}" id="fill-${r.id}" style="width:${p}%"></div></div>
+        <input class="prog-slider" type="range" min="0" max="100" step="5" value="${p}" oninput="onProgSlide('${r.id}',this.value)" onchange="setProgPct('${r.id}',this.value)">
+      </div>`;
+    });
+    const tags = done.length
+      ? `<div class="done-tags">`+done.map(r=>`<span class="done-tag" onclick="expandProg('${r.id}')">${esc(r.floor)} ✓${view.progEdit?`<b onclick="event.stopPropagation();delProg('${r.id}')">×</b>`:''}</span>`).join('')+`</div>`
+      : '';
+    html+=`<div class="card prog-group">
+      <div class="pg-head">
+        <div class="pg-title">${esc(item)}</div>
+        <div class="pg-avg"><span class="pg-avgnum">${avg}%</span>${view.progEdit?` <button class="del" onclick="delProgGroup('${esc(item)}')">🗑</button>`:''}</div>
+      </div>
+      ${bars}
+      ${tags}
+      <button class="btn ghost sm" style="margin-top:10px" onclick="openProgFloorForm('${esc(item)}')">＋ 樓層</button>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+function onProgSlide(id,v){
+  const pct=document.getElementById('pct-'+id), fill=document.getElementById('fill-'+id);
+  if(pct)pct.textContent=v+'%'; if(fill){ fill.style.width=v+'%'; fill.classList.toggle('full',(+v)>=100); }
+}
+function setProgPct(id,v){
+  const r=progStore().find(x=>x.id===id); if(!r)return;
+  r.percent=Math.max(0,Math.min(100,parseInt(v)||0));
+  if(r.percent<100) delete view.progExpanded[id];
+  saveState(); renderProg();
+}
+function expandProg(id){ view.progExpanded[id]=true; renderProg(); }
+function delProg(id){ const rows=progStore(); const i=rows.findIndex(x=>x.id===id); if(i>=0)rows.splice(i,1); delete view.progExpanded[id]; saveState(); renderProg(); }
+function delProgGroup(item){ if(!confirm('刪除整個「'+item+'」工項？'))return; state.progress[state.activeSiteId]=progStore().filter(r=>r.item!==item); saveState(); renderProg(); }
+function openProgGroupForm(){
+  openModal(`<h3>新增工項 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>施工項目（工項名稱）</span><input class="inp" id="pgItem" placeholder="例：輕隔間封板"></label>
+    <label class="fld"><span>樓層</span><input class="inp" id="pgFloor" placeholder="例：3F-A區"></label>
+    <label class="fld"><span>目前進度 %</span><input class="inp" id="pgPct" type="number" inputmode="numeric" value="0"></label>
+    <button class="btn full" onclick="addProgFromForm()">新增</button>`);
+}
+function openProgFloorForm(item){
+  openModal(`<h3>新增樓層 — ${esc(item)} <span class="x" onclick="closeModal()">×</span></h3>
+    <input type="hidden" id="pgItem" value="${esc(item)}">
+    <label class="fld"><span>樓層</span><input class="inp" id="pgFloor" placeholder="例：4F-B區"></label>
+    <label class="fld"><span>目前進度 %</span><input class="inp" id="pgPct" type="number" inputmode="numeric" value="0"></label>
+    <button class="btn full" onclick="addProgFromForm()">新增</button>`);
+}
+function addProgFromForm(){
+  const item=(document.getElementById('pgItem').value||'').trim();
+  const floor=(document.getElementById('pgFloor').value||'').trim();
+  let pct=parseInt(document.getElementById('pgPct').value)||0; pct=Math.max(0,Math.min(100,pct));
+  if(!item) return toast('請輸入工項名稱');
+  if(!floor) return toast('請輸入樓層');
+  progStore().push({id:uid(), item, floor, percent:pct});
+  saveState(); closeModal(); renderProg();
+}
+
 /* =================== 設定／備份還原 =================== */
 function openSettings(){
   openModal(`<h3>設定／備份 <span class="x" onclick="closeModal()">×</span></h3>
@@ -705,7 +862,7 @@ function openSettings(){
       <input type="file" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
     </label>
     <div class="warn" style="margin-top:0">
-      ⚠️ 請<b>不要刪除主畫面的「工」圖示</b> —— 刪除會清掉手機上的資料。<br>
+      ⚠️ 請<b>不要刪除主畫面圖示</b> —— 刪除會清掉手機上的資料。<br>
       更新版本會自動進行，不需要也不要刪圖示。
     </div>`);
 }
@@ -713,11 +870,11 @@ async function exportBackup(){
   toast('正在打包備份…');
   let photos=[];
   try{ const all=await photoGetAll(); for(const p of all){ if(p&&p.blob){ photos.push({id:p.id, meta:p.meta||null, data:await blobToDataURL(p.blob)}); } } }catch(e){}
-  const backup={ app:'工地管理員', version:1, exportedAt:new Date().toISOString(), state, photos };
-  const fname=`工地備份_${todayStr()}.json`;
+  const backup={ app:'泰郡工務系統', version:1, exportedAt:new Date().toISOString(), state, photos };
+  const fname=`泰郡工務備份_${todayStr()}.json`;
   const file=new File([JSON.stringify(backup)], fname, {type:'application/json'});
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:'工地管理員備份'}); return; }catch(e){ if(e.name==='AbortError') return; }
+    try{ await navigator.share({files:[file], title:'泰郡工務系統備份'}); return; }catch(e){ if(e.name==='AbortError') return; }
   }
   const url=URL.createObjectURL(file);
   const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
@@ -743,8 +900,8 @@ async function importBackup(input){
 /* =================== PWA manifest（inline，免額外檔） =================== */
 function setupPWA(){
   const icon='data:image/svg+xml,'+encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" rx="42" fill="#007AFF"/><text x="96" y="120" font-size="90" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="bold">工</text></svg>`);
-  const manifest={ name:'工地管理員', short_name:'工地管理員', start_url:'.', display:'standalone',
+    `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" rx="42" fill="#007AFF"/><text x="96" y="120" font-size="70" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="bold">泰郡</text></svg>`);
+  const manifest={ name:'泰郡工務系統', short_name:'泰郡工務', start_url:'.', display:'standalone',
     background_color:'#f2f2f7', theme_color:'#007AFF',
     icons:[{src:icon, sizes:'192x192', type:'image/svg+xml', purpose:'any'}] };
   const url=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'}));
@@ -759,7 +916,7 @@ function registerSW(){
 }
 
 /* =================== init =================== */
-function renderAll(){ renderSiteSelect(); renderCalendar(); renderDayLogs(); renderMat(); }
+function renderAll(){ renderSiteSelect(); renderCalendar(); renderDayLogs(); renderProg(); renderMat(); }
 function init(){ setupPWA(); registerSW(); renderAll(); }
 init();
 </script>
