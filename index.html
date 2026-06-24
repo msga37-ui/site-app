@@ -191,6 +191,21 @@ textarea.inp{resize:vertical; min-height:60px}
 .done-tag{display:inline-flex; align-items:center; gap:4px; background:rgba(52,199,89,.15); color:#1a8c3a; font-weight:700; font-size:13px; padding:6px 11px; border-radius:999px}
 .done-tag b{color:var(--red); font-size:15px; padding:0 2px; cursor:pointer}
 .del{font-size:15px; padding:2px 6px; background:none; opacity:.7}
+.work-chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:10px}
+.work-chip{font-size:13px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--inp); border:1px solid var(--border)}
+.work-chip.done{background:rgba(52,199,89,.15); color:#1a8c3a; border-color:transparent; font-weight:700}
+
+/* ===== 記錄卡片 / 表單項目 ===== */
+.rc-items{display:flex; flex-direction:column; gap:6px}
+.rc-line{display:flex; align-items:center; gap:6px; font-size:14px; flex-wrap:wrap}
+.rc-line .cdot{width:8px; height:8px; border-radius:50%; flex:none}
+.rc-line .rc-hc{color:var(--text2); font-size:12px}
+.rc-line .rc-pct{margin-left:auto; font-weight:800; font-size:13px; color:var(--text2)}
+.rc-line .rc-pct.done{color:var(--green)}
+.rec-item{background:var(--inp); border-radius:12px; padding:10px; margin-bottom:10px}
+.ri-top{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.ri-top select{flex:1; min-width:0; background:var(--card)}
+.ri-top .icon-btn{width:34px; height:34px; font-size:16px}
 
 /* ===== 算料 ===== */
 .seg{display:flex; background:var(--inp); border-radius:10px; padding:3px; margin-bottom:12px}
@@ -256,20 +271,22 @@ textarea.inp{resize:vertical; min-height:60px}
   </div>
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
-    <div style="font-weight:800;font-size:17px" id="dayTitle">當日日誌</div>
-    <button class="btn sm" onclick="openLogForm()">＋ 新增日誌</button>
+    <div style="font-weight:800;font-size:17px" id="dayTitle">當日記錄</div>
+    <button class="btn sm" onclick="newEntry()">＋ 新增</button>
   </div>
   <div id="dayLogs"></div>
 </div>
 
 <!-- ============ 進度 ============ -->
 <div class="screen" id="screen-prog">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px">
-    <div style="font-weight:800;font-size:17px">工項進度</div>
-    <div style="display:flex;gap:8px">
-      <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
-      <button class="btn sm" onclick="openProgGroupForm()">＋ 工項</button>
+  <div id="progSummary"></div>
+  <div style="display:flex;align-items:center;margin:4px 2px 12px;gap:8px">
+    <div class="seg" id="progViewSeg" style="flex:1;margin:0">
+      <button data-v="work" class="on" onclick="setProgView('work')">依工項</button>
+      <button data-v="floor" onclick="setProgView('floor')">依樓層</button>
     </div>
+    <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
+    <button class="btn sm" onclick="openProgAdd()">＋</button>
   </div>
   <div id="progList"></div>
 </div>
@@ -378,20 +395,62 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{},
+let view = { tab:'log', calcMode:'area', matCat:'frame', progEdit:false, progExpanded:{}, progView:'work', floorExpanded:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
   const sid = uid();
-  return { sites:[{id:sid, name:'案場一'}], activeSiteId:sid, logs:[], materials:{}, calcCoeffs:null };
+  return { sites:[{id:sid, name:'案場一'}], activeSiteId:sid,
+    records:{}, progress:{}, attendance:[], vendors:{}, workItems:LOG_ITEMS.slice(),
+    materials:{}, calcCoeffs:null };
 }
 function loadState(){
-  try{ const s=JSON.parse(localStorage.getItem('wm_state')); if(s&&s.sites&&s.sites.length) return s; }catch(e){}
-  return defaultState();
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem('wm_state')); }catch(e){}
+  if(!s||!s.sites||!s.sites.length) return defaultState();
+  return migrateState(s);
 }
-function saveState(){ localStorage.setItem('wm_state', JSON.stringify(state)); }
+function migrateState(s){
+  s.workItems = s.workItems || LOG_ITEMS.slice();
+  s.vendors   = s.vendors   || {};
+  s.records   = s.records   || {};
+  s.attendance= s.attendance|| [];
+  s.progress  = s.progress  || {};
+  s.materials = s.materials || {};
+  // 進度舊格式 {item,floor,percent} → {work,floor,percent,vendor}
+  Object.keys(s.progress).forEach(sid=>{
+    s.progress[sid]=(s.progress[sid]||[]).map(p=> (p.work!==undefined) ? p
+      : {id:p.id||uid(), work:p.item||'', floor:p.floor||'', percent:p.percent||0, vendor:''});
+  });
+  // 舊 logs → records（一次性轉換，含建立進度項與廠商清單）
+  if(Array.isArray(s.logs) && s.logs.length){
+    s.logs.forEach(l=>{
+      const sid=l.siteId; if(!sid) return;
+      s.records[sid]=s.records[sid]||[]; s.progress[sid]=s.progress[sid]||[];
+      const works=(l.items&&l.items.length)?l.items:[''];
+      const items=works.map((w,idx)=>{
+        let p=s.progress[sid].find(x=>x.work===w && x.floor===(l.floor||''));
+        if(!p){ p={id:uid(), work:w, floor:l.floor||'', percent:0, vendor:l.vendor||''}; s.progress[sid].push(p); }
+        return { progressId:p.id, headcount: idx===0?(parseFloat(l.headcount)||0):0 };
+      });
+      s.records[sid].push({ id:l.id||uid(), date:l.date, vendor:l.vendor||'', items, note:l.note||'', photos:l.photos||[] });
+      if(l.vendor){ s.vendors[sid]=s.vendors[sid]||[]; if(!s.vendors[sid].includes(l.vendor)) s.vendors[sid].push(l.vendor); }
+    });
+    delete s.logs;
+  }
+  return s;
+}
+function saveState(){ localStorage.setItem('wm_state', JSON.stringify(state)); markChanged(); }
 function activeSite(){ return state.sites.find(s=>s.id===state.activeSiteId) || state.sites[0]; }
 function getCoeffs(){ return state.calcCoeffs || DEFAULT_COEFFS; }
+function markChanged(){ try{ localStorage.setItem('wm_lastChange', Date.now()); }catch(e){} }
+/* ---- 批次A 資料 helper ---- */
+function workList(){ if(!state.workItems) state.workItems=LOG_ITEMS.slice(); return state.workItems; }
+function vendorList(){ if(!state.vendors) state.vendors={}; const sid=state.activeSiteId; if(!state.vendors[sid]) state.vendors[sid]=[]; return state.vendors[sid]; }
+function recStore(){ if(!state.records) state.records={}; const sid=state.activeSiteId; if(!state.records[sid]) state.records[sid]=[]; return state.records[sid]; }
+function progStore(){ if(!state.progress) state.progress={}; const sid=state.activeSiteId; if(!state.progress[sid]) state.progress[sid]=[]; return state.progress[sid]; }
+function progById(id){ return progStore().find(p=>p.id===id); }
+function upsertProgress(work, floor, vendor){ const list=progStore(); let p=list.find(x=>x.work===work && x.floor===floor); if(!p){ p={id:uid(), work, floor, percent:0, vendor:vendor||''}; list.push(p); } else if(vendor){ p.vendor=vendor; } return p; }
 
 /* =================== IndexedDB 照片 store（foundation，供之後模組使用） =================== */
 let _db=null;
@@ -448,8 +507,8 @@ function delSite(){
   if(!confirm('確定刪除此案場？該案場日誌與材料資料會一併移除。')) return;
   const id=state.activeSiteId;
   state.sites=state.sites.filter(s=>s.id!==id);
-  state.logs=state.logs.filter(l=>l.siteId!==id);
-  delete state.materials[id];
+  delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
+  state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
   state.activeSiteId=state.sites[0].id; saveState(); closeModal(); renderAll();
 }
 
@@ -471,10 +530,12 @@ function moveMonth(d){
   if(view.calMonth>11){view.calMonth=0; view.calYear++;}
   renderCalendar();
 }
-function logsOn(dateStr){ return state.logs.filter(l=>l.siteId===state.activeSiteId && l.date===dateStr); }
+function recordsOn(dateStr){ return recStore().filter(r=>r.date===dateStr); }
+function attendOn(dateStr){ return (state.attendance||[]).filter(a=>a.date===dateStr && (a.sites||[]).includes(state.activeSiteId)); }
+function workColor(work){ return ITEM_COLOR[work] || 'blue'; }
 function dayColors(dateStr){
   const set=new Set();
-  logsOn(dateStr).forEach(l=>(l.items||[]).forEach(it=>{ if(ITEM_COLOR[it]) set.add(ITEM_COLOR[it]); }));
+  recordsOn(dateStr).forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p) set.add(workColor(p.work)); }));
   return ['blue','orange','red'].filter(c=>set.has(c));
 }
 function renderCalendar(){
@@ -495,38 +556,48 @@ function renderCalendar(){
   }
   document.getElementById('calGrid').innerHTML=html;
 }
-function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDayLogs(); }
+function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDay(); }
 
-function renderDayLogs(){
-  document.getElementById('dayTitle').textContent=`${view.selDate} 日誌`;
-  const logs=logsOn(view.selDate);
+function renderDay(){
+  document.getElementById('dayTitle').textContent=`${view.selDate} 記錄`;
+  const recs=recordsOn(view.selDate), atts=attendOn(view.selDate);
   const box=document.getElementById('dayLogs');
-  if(!logs.length){ box.innerHTML=`<div class="empty">這天還沒有日誌<br>點右上「＋ 新增日誌」開始記錄</div>`; return; }
-  box.innerHTML=logs.map(l=>{
-    const chips=(l.items||[]).map(it=>`<span class="chip c-${ITEM_COLOR[it]||'blue'}">${esc(it)}</span>`).join('');
-    const photoStrip=(l.photos&&l.photos.length)?`<div class="photo-strip" id="ph-${l.id}"></div>`:'';
-    return `<div class="log-card">
-      <div class="lc-top">
-        <div style="font-weight:700">${esc(l.floor||'未填樓層')} · ${esc(l.vendor||'未填廠商')}</div>
-        <button class="btn green sm" onclick="shareLine('${l.id}')">LINE</button>
-      </div>
-      <div class="lc-meta">進場人數：${esc(l.headcount||'-')} 人${l.note?' ｜ '+esc(l.note):''}</div>
-      <div class="chips">${chips||'<span class="muted">未選工項</span>'}</div>
-      ${photoStrip}
-      <div style="margin-top:10px;display:flex;gap:8px">
-        <button class="btn ghost sm" onclick="openLogForm('${l.id}')">編輯</button>
-        <button class="btn gray sm" onclick="delLog('${l.id}')">刪除</button>
-      </div>
-    </div>`;
-  }).join('');
-  loadCardThumbs(logs);
+  if(!recs.length && !atts.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
+  box.innerHTML = recs.map(recordCard).join('') + atts.map(attendCard).join('');
+  loadCardThumbs(recs);
 }
-async function loadCardThumbs(logs){
-  for(const l of logs){
-    if(!l.photos||!l.photos.length) continue;
-    const el=document.getElementById('ph-'+l.id); if(!el) continue;
+function recordCard(r){
+  const items=(r.items||[]).map(it=>{
+    const p=progById(it.progressId); if(!p) return '';
+    const done=(+p.percent||0)>=100;
+    return `<div class="rc-line"><span class="cdot" style="background:${COLOR_HEX[workColor(p.work)]}"></span><b>${esc(p.work||'-')}</b> <span class="muted">${esc(p.floor||'')}</span>${it.headcount?` <span class="rc-hc">${it.headcount}人</span>`:''} <span class="rc-pct${done?' done':''}">${done?'✓':(p.percent||0)+'%'}</span></div>`;
+  }).join('');
+  const photoStrip=(r.photos&&r.photos.length)?`<div class="photo-strip" id="ph-${r.id}"></div>`:'';
+  return `<div class="log-card">
+    <div class="lc-top"><div style="font-weight:700">${esc(r.vendor||'未填廠商')}</div><button class="btn green sm" onclick="shareRecord('${r.id}')">LINE</button></div>
+    <div class="rc-items">${items||'<span class="muted">未選工項</span>'}</div>
+    ${r.note?`<div class="lc-meta">${esc(r.note)}</div>`:''}
+    ${photoStrip}
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn ghost sm" onclick="openRecordForm('${r.id}')">編輯</button>
+      <button class="btn gray sm" onclick="delRecord('${r.id}')">刪除</button>
+    </div>
+  </div>`;
+}
+function attendCard(a){
+  const names=(a.sites||[]).map(id=>{ const s=state.sites.find(x=>x.id===id); return s?s.name:''; }).filter(Boolean).join('、');
+  return `<div class="log-card">
+    <div class="lc-top"><div style="font-weight:700">🧑‍🔧 出勤</div><button class="btn gray sm" onclick="delAttend('${a.id}')">刪除</button></div>
+    <div class="lc-meta">${esc(names||'—')}</div>
+    <div style="margin-top:8px"><button class="btn ghost sm" onclick="openAttendForm('${a.id}')">編輯</button></div>
+  </div>`;
+}
+async function loadCardThumbs(recs){
+  for(const r of recs){
+    if(!r.photos||!r.photos.length) continue;
+    const el=document.getElementById('ph-'+r.id); if(!el) continue;
     let h='';
-    for(const pid of l.photos){
+    for(const pid of r.photos){
       try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); h+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){}
     }
     el.innerHTML=h;
@@ -534,86 +605,163 @@ async function loadCardThumbs(logs){
 }
 function viewPhoto(u){ openModal(`<div style="text-align:center"><img src="${u}" style="max-width:100%;border-radius:12px"><button class="btn full" style="margin-top:14px" onclick="closeModal()">關閉</button></div>`); }
 
-/* 日誌表單 */
+/* ===== 記錄／出勤 表單 ===== */
 let _logPhotos=[];       // 目前表單照片 [{id, blob?, url}]
 let _origPhotoIds=[];    // 編輯前已存在的照片 id
-async function openLogForm(id){
-  const editing = id ? state.logs.find(l=>l.id===id) : null;
-  const cur = editing || {date:view.selDate, vendor:'', floor:'', headcount:'', items:[], note:''};
-  _origPhotoIds = (editing&&editing.photos)?editing.photos.slice():[];
-  _logPhotos=[];
-  const opts = LOG_ITEMS.map(it=>`<button type="button" class="opt${(cur.items||[]).includes(it)?' on':''}" data-it="${esc(it)}" onclick="this.classList.toggle('on')">${esc(it)}</button>`).join('');
-  openModal(`<h3>${editing?'編輯':'新增'}施工日誌 <span class="x" onclick="closeModal()">×</span></h3>
-    <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
-    <label class="fld"><span>日期</span><input class="inp" type="date" id="lfDate" value="${esc(cur.date)}"></label>
-    <label class="fld"><span>施工廠商</span><input class="inp" id="lfVendor" value="${esc(cur.vendor)}" placeholder="例：明昌輕鋼架"></label>
-    <div class="row">
-      <label class="fld"><span>施工樓層</span><input class="inp" id="lfFloor" value="${esc(cur.floor)}" placeholder="例：3F-A區"></label>
-      <label class="fld"><span>進場人數</span><input class="inp" id="lfHead" type="number" inputmode="numeric" value="${esc(cur.headcount)}"></label>
-    </div>
-    <label class="fld"><span>施工項目（可多選）</span></label>
-    <div class="item-pick" id="lfItems">${opts}</div>
-    <label class="fld" style="margin-top:12px"><span>現場照片</span></label>
-    <div class="photo-strip" id="lfPhotos"></div>
-    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選照片
-      <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addLogPhotos(this.files);this.value=''">
-    </label>
-    <label class="fld"><span>備註</span><textarea class="inp" id="lfNote" placeholder="補充說明…">${esc(cur.note)}</textarea></label>
-    <button class="btn full" onclick="saveLog(${editing?`'${id}'`:'null'})">儲存日誌</button>`);
-  for(const pid of _origPhotoIds){
-    try{ const rec=await photoGet(pid); if(rec&&rec.blob) _logPhotos.push({id:pid, url:URL.createObjectURL(rec.blob)}); }catch(e){}
-  }
-  renderLogPhotoStrip();
+let _rec=null;           // 目前編輯中的記錄/出勤暫存
+
+function newEntry(){
+  _rec={ type:'record', date:view.selDate, vendor:vendorList()[0]||'',
+    items:[{work:'',floor:'',percent:0,headcount:''}], note:'', attendSites:[], editId:null };
+  _origPhotoIds=[]; _logPhotos=[]; showRecordModal();
 }
+function openRecordForm(id){
+  const r=recStore().find(x=>x.id===id); if(!r)return;
+  _rec={ type:'record', date:r.date, vendor:r.vendor||'',
+    items:(r.items||[]).map(it=>{ const p=progById(it.progressId)||{}; return {progressId:it.progressId, work:p.work||'', floor:p.floor||'', percent:p.percent||0, headcount:(it.headcount===0?0:(it.headcount||''))}; }),
+    note:r.note||'', attendSites:[], editId:id };
+  if(!_rec.items.length) _rec.items=[{work:'',floor:'',percent:0,headcount:''}];
+  _origPhotoIds=(r.photos||[]).slice(); _logPhotos=[];
+  showRecordModal();
+  (async()=>{ for(const pid of _origPhotoIds){ try{ const rec=await photoGet(pid); if(rec&&rec.blob)_logPhotos.push({id:pid,url:URL.createObjectURL(rec.blob)}); }catch(e){} } renderLogPhotoStrip(); })();
+}
+function openAttendForm(id){
+  const a=(state.attendance||[]).find(x=>x.id===id);
+  _rec={ type:'attend', date:a?a.date:view.selDate, vendor:'', items:[], note:'', attendSites:a?(a.sites||[]).slice():[state.activeSiteId], editId:id };
+  _origPhotoIds=[]; _logPhotos=[]; showRecordModal();
+}
+function recItemRow(it,i){
+  const opts=['<option value="">選擇工項</option>',...workList().map(w=>`<option${w===it.work?' selected':''}>${esc(w)}</option>`)].join('');
+  return `<div class="rec-item">
+    <div class="ri-top">
+      <select class="inp" onchange="_rec.items[${i}].work=this.value">${opts}</select>
+      <button class="icon-btn" onclick="openWorkManage()" title="管理工項">⚙</button>
+      <button class="del" onclick="recDelItem(${i})">🗑</button>
+    </div>
+    <div class="row">
+      <label class="fld" style="margin-bottom:6px"><span>樓層/區域</span><input class="inp" value="${esc(it.floor)}" onchange="_rec.items[${i}].floor=this.value" placeholder="例：3F-A區"></label>
+      <label class="fld" style="margin-bottom:6px"><span>人數</span><input class="inp" type="number" inputmode="decimal" value="${it.headcount}" onchange="_rec.items[${i}].headcount=(this.value===''?'':+this.value)" placeholder="人"></label>
+    </div>
+    <div class="prog-rowtop"><span class="prog-floor">進度</span><span class="prog-pct" id="ri-pct-${i}">${it.percent||0}%</span></div>
+    <input class="prog-slider" type="range" min="0" max="100" step="5" value="${it.percent||0}" oninput="document.getElementById('ri-pct-${i}').textContent=this.value+'%';_rec.items[${i}].percent=+this.value">
+  </div>`;
+}
+function showRecordModal(){
+  const isRec=_rec.type==='record';
+  let body;
+  if(isRec){
+    const vOpts=['<option value="">（未選廠商）</option>',...vendorList().map(v=>`<option${v===_rec.vendor?' selected':''}>${esc(v)}</option>`)].join('');
+    const itemsHtml=_rec.items.map((it,i)=>recItemRow(it,i)).join('');
+    body=`<label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_rec.date)}" onchange="_rec.date=this.value"></label>
+      <label class="fld"><span>施工廠商</span>
+        <div style="display:flex;gap:8px"><select class="inp" onchange="_rec.vendor=this.value">${vOpts}</select><button class="icon-btn" onclick="openVendorManage()" title="管理廠商">⚙</button></div>
+      </label>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin:8px 2px 4px">施工項目</div>
+      <div id="recItems">${itemsHtml}</div>
+      <button class="btn ghost sm full" style="margin:4px 0 14px" onclick="recAddItem()">＋ 項目</button>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">現場照片</div>
+      <div class="photo-strip" id="lfPhotos"></div>
+      <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選照片<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addLogPhotos(this.files);this.value=''"></label>
+      <label class="fld"><span>備註</span><textarea class="inp" onchange="_rec.note=this.value" placeholder="補充說明…">${esc(_rec.note)}</textarea></label>`;
+  } else {
+    const checks=state.sites.map(s=>`<button type="button" class="opt${_rec.attendSites.includes(s.id)?' on':''}" onclick="toggleAttendSite('${s.id}',this)">${esc(s.name)}</button>`).join('');
+    body=`<label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_rec.date)}" onchange="_rec.date=this.value"></label>
+      <label class="fld"><span>當天有出工的案場（可多選）</span></label>
+      <div class="item-pick">${checks}</div>`;
+  }
+  const toggle=_rec.editId?'':`<div class="seg" style="margin-bottom:14px">
+      <button class="${isRec?'on':''}" onclick="_rec.type='record';showRecordModal()">記錄</button>
+      <button class="${!isRec?'on':''}" onclick="_rec.type='attend';showRecordModal()">出勤</button></div>`;
+  openModal(`<h3>${_rec.editId?'編輯':'新增'}${isRec?'記錄':'出勤'} <span class="x" onclick="closeModal()">×</span></h3>
+    ${toggle}
+    <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
+    ${body}
+    <button class="btn full" onclick="saveEntry()">儲存</button>`);
+  if(isRec) renderLogPhotoStrip();
+}
+function recAddItem(){ _rec.items.push({work:'',floor:'',percent:0,headcount:''}); showRecordModal(); }
+function recDelItem(i){ _rec.items.splice(i,1); if(!_rec.items.length)_rec.items.push({work:'',floor:'',percent:0,headcount:''}); showRecordModal(); }
+function toggleAttendSite(id,btn){ const i=_rec.attendSites.indexOf(id); if(i<0)_rec.attendSites.push(id); else _rec.attendSites.splice(i,1); btn.classList.toggle('on'); }
+
+/* 廠商管理（分案場） */
+function openVendorManage(){
+  const list=vendorList();
+  openModal(`<h3>管理廠商（${esc(activeSite().name)}） <span class="x" onclick="showRecordModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">此案場的廠商清單，記錄時可下拉選。</div>
+    ${list.map((v,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(v)}</div><button class="del" onclick="delVendor(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無廠商</div>'}
+    <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="vmNew" placeholder="新增廠商名稱"><button class="btn" onclick="addVendor()">新增</button></div>
+    <button class="btn ghost full" style="margin-top:14px" onclick="showRecordModal()">完成</button>`);
+}
+function addVendor(){ const n=(document.getElementById('vmNew').value||'').trim(); if(!n)return toast('請輸入名稱'); const list=vendorList(); if(!list.includes(n))list.push(n); _rec.vendor=n; saveState(); openVendorManage(); }
+function delVendor(i){ vendorList().splice(i,1); saveState(); openVendorManage(); }
+
+/* 工項管理（全域共用） */
+function openWorkManage(){
+  const list=workList();
+  openModal(`<h3>管理工項 <span class="x" onclick="showRecordModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">所有案場共用的施工項目清單。</div>
+    ${list.map((w,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(w)}</div><button class="del" onclick="delWork(${i})">🗑</button></div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="wmNew" placeholder="新增工項名稱"><button class="btn" onclick="addWork()">新增</button></div>
+    <button class="btn ghost full" style="margin-top:14px" onclick="showRecordModal()">完成</button>`);
+}
+function addWork(){ const n=(document.getElementById('wmNew').value||'').trim(); if(!n)return toast('請輸入名稱'); const list=workList(); if(!list.includes(n))list.push(n); saveState(); openWorkManage(); }
+function delWork(i){ workList().splice(i,1); saveState(); openWorkManage(); }
+
+/* 照片 helper（記錄表單共用） */
 function renderLogPhotoStrip(){
   const el=document.getElementById('lfPhotos'); if(!el)return;
   el.innerHTML=_logPhotos.length
     ? _logPhotos.map((p,i)=>`<div class="thumb"><img src="${p.url}"><button class="thumb-x" onclick="removeLogPhoto(${i})">×</button></div>`).join('')
     : '<span class="muted">尚無照片</span>';
 }
-function addLogPhotos(files){
-  [...files].forEach(f=>{ _logPhotos.push({id:uid(), blob:f, url:URL.createObjectURL(f)}); });
-  renderLogPhotoStrip();
-}
+function addLogPhotos(files){ [...files].forEach(f=>{ _logPhotos.push({id:uid(), blob:f, url:URL.createObjectURL(f)}); }); renderLogPhotoStrip(); }
 function removeLogPhoto(i){ const p=_logPhotos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _logPhotos.splice(i,1); renderLogPhotoStrip(); }
 
-async function saveLog(id){
-  const items=[...document.querySelectorAll('#lfItems .opt.on')].map(b=>b.dataset.it);
-  const data={
-    date:document.getElementById('lfDate').value||todayStr(),
-    vendor:document.getElementById('lfVendor').value.trim(),
-    floor:document.getElementById('lfFloor').value.trim(),
-    headcount:document.getElementById('lfHead').value.trim(),
-    items, note:document.getElementById('lfNote').value.trim(),
-  };
-  for(const p of _logPhotos){ if(p.blob){ try{ await photoPut(p.id, p.blob, {date:data.date}); }catch(e){} } }
-  data.photos=_logPhotos.map(p=>p.id);
-  for(const oid of _origPhotoIds){ if(!data.photos.includes(oid)){ try{ await photoDel(oid); }catch(e){} } }
-  if(id){ Object.assign(state.logs.find(l=>l.id===id), data); }
-  else { state.logs.push({id:uid(), siteId:state.activeSiteId, ...data}); }
-  view.selDate=data.date;
-  saveState(); closeModal(); renderCalendar(); renderDayLogs();
-  toast('日誌已儲存');
+async function saveEntry(){
+  if(_rec.type==='attend'){
+    if(!_rec.attendSites.length) return toast('請至少勾選一個案場');
+    const a={ id:_rec.editId||uid(), date:_rec.date||todayStr(), sites:_rec.attendSites.slice() };
+    if(!state.attendance) state.attendance=[];
+    const idx=_rec.editId?state.attendance.findIndex(x=>x.id===_rec.editId):-1;
+    if(idx>=0) state.attendance[idx]=a; else state.attendance.push(a);
+    view.selDate=a.date; saveState(); closeModal(); renderCalendar(); renderDay(); toast('出勤已儲存'); return;
+  }
+  const valid=_rec.items.filter(it=>it.work);
+  if(!valid.length) return toast('請至少選一個工項');
+  for(const p of _logPhotos){ if(p.blob){ try{ await photoPut(p.id,p.blob,{date:_rec.date}); }catch(e){} } }
+  const photos=_logPhotos.map(p=>p.id);
+  for(const oid of _origPhotoIds){ if(!photos.includes(oid)){ try{ await photoDel(oid); }catch(e){} } }
+  const items=valid.map(it=>{
+    const p=upsertProgress(it.work, it.floor||'', _rec.vendor);
+    p.percent=Math.max(0,Math.min(100,+it.percent||0)); if(_rec.vendor)p.vendor=_rec.vendor;
+    return { progressId:p.id, headcount:(it.headcount===''?0:(+it.headcount||0)) };
+  });
+  const rec={ id:_rec.editId||uid(), date:_rec.date||todayStr(), vendor:_rec.vendor||'', items, note:_rec.note||'', photos };
+  const store=recStore();
+  const idx=_rec.editId?store.findIndex(r=>r.id===_rec.editId):-1;
+  if(idx>=0) store[idx]=rec; else store.push(rec);
+  view.selDate=rec.date; saveState(); closeModal(); renderCalendar(); renderDay(); toast('記錄已儲存');
 }
-function delLog(id){
-  if(!confirm('刪除此筆日誌？'))return;
-  const l=state.logs.find(x=>x.id===id);
-  if(l&&l.photos) l.photos.forEach(pid=>photoDel(pid).catch(()=>{}));
-  state.logs=state.logs.filter(l=>l.id!==id); saveState(); renderCalendar(); renderDayLogs();
+function delRecord(id){
+  if(!confirm('刪除此筆記錄？'))return;
+  const r=recStore().find(x=>x.id===id);
+  if(r&&r.photos) r.photos.forEach(pid=>photoDel(pid).catch(()=>{}));
+  state.records[state.activeSiteId]=recStore().filter(x=>x.id!==id);
+  saveState(); renderCalendar(); renderDay();
 }
+function delAttend(id){ if(!confirm('刪除此筆出勤？'))return; state.attendance=(state.attendance||[]).filter(x=>x.id!==id); saveState(); renderCalendar(); renderDay(); }
 
-/* LINE 分享 */
-function lineText(l){
-  return `【案場】${activeSite().name}\n【日期】${l.date}\n【廠商】${l.vendor||'-'}\n【樓層】${l.floor||'-'}\n【人數】${l.headcount||'-'} 人\n【施工項目】${(l.items||[]).join('、')||'-'}${l.note?'\n【備註】'+l.note:''}`;
+/* LINE 分享（記錄） */
+function recordLineText(r){
+  const lines=(r.items||[]).map(it=>{ const p=progById(it.progressId); if(!p)return ''; const done=(+p.percent||0)>=100; return `・${p.work} ${p.floor||''} ${it.headcount?it.headcount+'人 ':''}${done?'✓完成':(p.percent||0)+'%'}`; }).filter(Boolean).join('\n');
+  return `【案場】${activeSite().name}\n【日期】${r.date}\n【廠商】${r.vendor||'-'}\n【施工項目】\n${lines}${r.note?'\n【備註】'+r.note:''}`;
 }
-async function shareLine(id){
-  const l=state.logs.find(x=>x.id===id); if(!l)return;
-  const txt=lineText(l);
+async function shareRecord(id){
+  const r=recStore().find(x=>x.id===id); if(!r)return;
+  const txt=recordLineText(r);
   let files=[];
-  if(l.photos&&l.photos.length){
-    for(const pid of l.photos){
-      try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob], pid+'.'+ext, {type:t})); } }catch(e){}
-    }
+  if(r.photos&&r.photos.length){
+    for(const pid of r.photos){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob],pid+'.'+ext,{type:t})); } }catch(e){} }
   }
   try{ await navigator.clipboard.writeText(txt); }catch(e){}
   if(navigator.share){
@@ -621,7 +769,7 @@ async function shareLine(id){
     if(files.length && navigator.canShare && navigator.canShare({files})) payload.files=files;
     try{ await navigator.share(payload); return; }catch(e){ if(e.name==='AbortError')return; }
   }
-  toast(files.length?'文字已複製（此裝置不支援帶圖分享，請手動加圖）':'已複製，貼到 LINE 群組即可');
+  toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
 }
 
 /* =================== 材料點收 =================== */
@@ -763,93 +911,123 @@ function setSpec(name,sid,field,v){
 function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
 function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
 
-/* =================== 工項進度 =================== */
-function progStore(){
-  if(!state.progress) state.progress={};
-  const sid=state.activeSiteId;
-  if(!state.progress[sid]) state.progress[sid]=[];
-  return state.progress[sid];
-}
+/* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
+function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
 function toggleProgEdit(){
   view.progEdit=!view.progEdit;
   const b=document.getElementById('progEditBtn');
   b.textContent=view.progEdit?'完成':'編輯'; b.classList.toggle('green',view.progEdit);
   renderProg();
 }
+function setProgView(v){ view.progView=v; renderProg(); }
+function floorOrderNum(f){ const m=String(f).match(/^([BR]?)(\d+)/i); if(!m) return 99999; let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; return n; }
+function renderProgSummary(){
+  const list=progStore();
+  const avg=list.length?Math.round(list.reduce((t,p)=>t+(+p.percent||0),0)/list.length):0;
+  const vendors=vendorList().join('、')||activeSite().name;
+  document.getElementById('progSummary').innerHTML=`<div class="card" style="padding:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div><div style="font-weight:700">${esc(vendors)}</div><div class="muted">總出工 ${totalHeadcount()} 人</div></div>
+      <div style="font-size:26px;font-weight:800;color:var(--blue)">${avg}%</div>
+    </div>
+    <div class="prog-bar" style="height:12px;margin-top:8px"><div class="prog-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
+  </div>`;
+}
+function mergeDoneFloors(entries){ // entries:[{id,floor}] 皆 100%
+  const numbered=[], singles=[];
+  entries.forEach(e=>{ const m=String(e.floor).match(/^([BR]?)(\d+)F$/i); if(m){ let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; numbered.push({...e,n}); } else singles.push({label:e.floor||'(未填)', ids:[e.id]}); });
+  numbered.sort((a,b)=>a.n-b.n);
+  const out=[]; let i=0;
+  while(i<numbered.length){ let j=i; const ids=[numbered[i].id]; while(j+1<numbered.length && numbered[j+1].n===numbered[j].n+1){ j++; ids.push(numbered[j].id); } out.push({label: j>i?`${numbered[i].floor}-${numbered[j].floor}`:numbered[i].floor, ids}); i=j+1; }
+  return [...out,...singles];
+}
+function idsAttr(ids){ return esc(JSON.stringify(ids)); }
 function renderProg(){
-  const rows=progStore();
+  const seg=document.getElementById('progViewSeg');
+  if(seg){ seg.querySelector('[data-v=work]').classList.toggle('on',view.progView!=='floor'); seg.querySelector('[data-v=floor]').classList.toggle('on',view.progView==='floor'); }
+  renderProgSummary();
+  const list=progStore();
   const box=document.getElementById('progList');
-  if(!rows.length){ box.innerHTML=`<div class="empty">還沒有工項進度<br>點右上「＋ 工項」新增施工項目</div>`; return; }
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現<br>（或點右上「＋」直接新增進度項）</div>`; return; }
+  box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
+}
+function progBar(p){
+  const v=Math.max(0,Math.min(100,+p.percent||0));
+  return `<div class="prog-row">
+    <div class="prog-rowtop"><span class="prog-floor">${esc(p.floor||'(未填樓層)')}</span><span class="prog-pct" id="pct-${p.id}">${v}%</span>${view.progEdit?`<button class="del" onclick="delProg('${p.id}')">🗑</button>`:''}</div>
+    <div class="prog-bar"><div class="prog-fill${v>=100?' full':''}" id="fill-${p.id}" style="width:${v}%"></div></div>
+    <input class="prog-slider" type="range" min="0" max="100" step="5" value="${v}" oninput="onProgSlide('${p.id}',this.value)" onchange="setProgPct('${p.id}',this.value)">
+  </div>`;
+}
+function progHtmlByWork(list){
   const groups={}, order=[];
-  rows.forEach(r=>{ if(!groups[r.item]){ groups[r.item]=[]; order.push(r.item); } groups[r.item].push(r); });
-  let html='';
-  order.forEach(item=>{
-    const list=groups[item];
-    const avg=Math.round(list.reduce((t,r)=>t+(+r.percent||0),0)/list.length);
+  list.forEach(p=>{ if(!groups[p.work]){ groups[p.work]=[]; order.push(p.work); } groups[p.work].push(p); });
+  return order.map(work=>{
+    const g=groups[work];
+    const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
     const active=[], done=[];
-    list.forEach(r=>{ ((+r.percent||0)>=100 && !view.progExpanded[r.id]) ? done.push(r) : active.push(r); });
-    let bars='';
-    active.forEach(r=>{
-      const p=Math.max(0,Math.min(100,+r.percent||0));
-      bars+=`<div class="prog-row">
-        <div class="prog-rowtop">
-          <span class="prog-floor">${esc(r.floor)}</span>
-          <span class="prog-pct" id="pct-${r.id}">${p}%</span>
-          ${view.progEdit?`<button class="del" onclick="delProg('${r.id}')">🗑</button>`:''}
-        </div>
-        <div class="prog-bar"><div class="prog-fill${p>=100?' full':''}" id="fill-${r.id}" style="width:${p}%"></div></div>
-        <input class="prog-slider" type="range" min="0" max="100" step="5" value="${p}" oninput="onProgSlide('${r.id}',this.value)" onchange="setProgPct('${r.id}',this.value)">
-      </div>`;
-    });
-    const tags = done.length
-      ? `<div class="done-tags">`+done.map(r=>`<span class="done-tag" onclick="expandProg('${r.id}')">${esc(r.floor)} ✓${view.progEdit?`<b onclick="event.stopPropagation();delProg('${r.id}')">×</b>`:''}</span>`).join('')+`</div>`
-      : '';
-    html+=`<div class="card prog-group">
-      <div class="pg-head">
-        <div class="pg-title">${esc(item)}</div>
-        <div class="pg-avg"><span class="pg-avgnum">${avg}%</span>${view.progEdit?` <button class="del" onclick="delProgGroup('${esc(item)}')">🗑</button>`:''}</div>
-      </div>
-      ${bars}
-      ${tags}
-      <button class="btn ghost sm" style="margin-top:10px" onclick="openProgFloorForm('${esc(item)}')">＋ 樓層</button>
+    g.forEach(p=>{ ((+p.percent||0)>=100 && !view.progExpanded[p.id]) ? done.push(p) : active.push(p); });
+    active.sort((a,b)=>floorOrderNum(a.floor)-floorOrderNum(b.floor));
+    const bars=active.map(progBar).join('');
+    const merged=mergeDoneFloors(done.map(p=>({id:p.id,floor:p.floor})));
+    const tags=merged.length?`<div class="done-tags">`+merged.map(m=>`<span class="done-tag" onclick="expandProgIds(${idsAttr(m.ids)})">${esc(m.label)} ✓${view.progEdit?`<b onclick="event.stopPropagation();delProgIds(${idsAttr(m.ids)})">×</b>`:''}</span>`).join('')+`</div>`:'';
+    return `<div class="card prog-group">
+      <div class="pg-head"><div class="pg-title">${esc(work||'(未命名)')}</div><div class="pg-avg"><span class="pg-avgnum">${avg}%</span></div></div>
+      ${bars}${tags}
     </div>`;
-  });
-  box.innerHTML=html;
+  }).join('');
 }
-function onProgSlide(id,v){
-  const pct=document.getElementById('pct-'+id), fill=document.getElementById('fill-'+id);
-  if(pct)pct.textContent=v+'%'; if(fill){ fill.style.width=v+'%'; fill.classList.toggle('full',(+v)>=100); }
+function progHtmlByFloor(list){
+  const groups={}, order=[];
+  list.forEach(p=>{ const f=p.floor||'(未填樓層)'; if(!groups[f]){ groups[f]=[]; order.push(f); } groups[f].push(p); });
+  order.sort((a,b)=>floorOrderNum(a)-floorOrderNum(b));
+  return order.map(floor=>{
+    const g=groups[floor];
+    const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
+    const open=view.floorExpanded[floor];
+    const chips=g.map(p=>{ const done=(+p.percent||0)>=100; return `<span class="work-chip${done?' done':''}" onclick="openProgCard('${p.id}')">${esc(p.work)}${done?' ✓':' '+(p.percent||0)+'%'}</span>`; }).join('');
+    return `<div class="card prog-group">
+      <div class="pg-head" onclick="toggleFloor('${esc(floor)}')" style="cursor:pointer">
+        <div class="pg-title">${esc(floor)} <span style="color:var(--text2);font-size:12px">${open?'▼':'▶'}</span></div>
+        <div class="pg-avg"><span class="pg-avgnum">${avg}%</span></div>
+      </div>
+      <div class="prog-bar" style="margin-top:4px"><div class="prog-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
+      ${open?`<div class="work-chips">${chips}</div>`:''}
+    </div>`;
+  }).join('');
 }
-function setProgPct(id,v){
-  const r=progStore().find(x=>x.id===id); if(!r)return;
-  r.percent=Math.max(0,Math.min(100,parseInt(v)||0));
-  if(r.percent<100) delete view.progExpanded[id];
-  saveState(); renderProg();
-}
+function toggleFloor(f){ view.floorExpanded[f]=!view.floorExpanded[f]; renderProg(); }
+function onProgSlide(id,v){ const pct=document.getElementById('pct-'+id), fill=document.getElementById('fill-'+id); if(pct)pct.textContent=v+'%'; if(fill){ fill.style.width=v+'%'; fill.classList.toggle('full',(+v)>=100); } }
+function setProgPct(id,v){ const p=progById(id); if(!p)return; p.percent=Math.max(0,Math.min(100,parseInt(v)||0)); if(p.percent<100)delete view.progExpanded[id]; saveState(); renderProg(); }
 function expandProg(id){ view.progExpanded[id]=true; renderProg(); }
-function delProg(id){ const rows=progStore(); const i=rows.findIndex(x=>x.id===id); if(i>=0)rows.splice(i,1); delete view.progExpanded[id]; saveState(); renderProg(); }
-function delProgGroup(item){ if(!confirm('刪除整個「'+item+'」工項？'))return; state.progress[state.activeSiteId]=progStore().filter(r=>r.item!==item); saveState(); renderProg(); }
-function openProgGroupForm(){
-  openModal(`<h3>新增工項 <span class="x" onclick="closeModal()">×</span></h3>
-    <label class="fld"><span>施工項目（工項名稱）</span><input class="inp" id="pgItem" placeholder="例：輕隔間封板"></label>
-    <label class="fld"><span>樓層</span><input class="inp" id="pgFloor" placeholder="例：3F-A區"></label>
-    <label class="fld"><span>目前進度 %</span><input class="inp" id="pgPct" type="number" inputmode="numeric" value="0"></label>
-    <button class="btn full" onclick="addProgFromForm()">新增</button>`);
+function expandProgIds(ids){ (ids||[]).forEach(id=>view.progExpanded[id]=true); renderProg(); }
+function delProg(id){ state.progress[state.activeSiteId]=progStore().filter(p=>p.id!==id); delete view.progExpanded[id]; saveState(); renderProg(); }
+function delProgIds(ids){ if(!confirm('刪除這些已完成樓層的進度？'))return; const set=new Set(ids); state.progress[state.activeSiteId]=progStore().filter(p=>!set.has(p.id)); saveState(); renderProg(); }
+function openProgCard(id){
+  const p=progById(id); if(!p)return;
+  const v=Math.max(0,Math.min(100,+p.percent||0));
+  openModal(`<h3>${esc(p.work)} — ${esc(p.floor||'')} <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="prog-rowtop"><span class="prog-floor">進度</span><span class="prog-pct" id="card-pct">${v}%</span></div>
+    <div class="prog-bar"><div class="prog-fill${v>=100?' full':''}" id="card-fill" style="width:${v}%"></div></div>
+    <input class="prog-slider" type="range" min="0" max="100" step="5" value="${v}" oninput="document.getElementById('card-pct').textContent=this.value+'%';document.getElementById('card-fill').style.width=this.value+'%'" onchange="setProgPctCard('${id}',this.value)">
+    <div class="row" style="margin-top:16px"><button class="btn gray" onclick="delProgCard('${id}')">刪除此項</button><button class="btn" onclick="closeModal()">完成</button></div>`);
 }
-function openProgFloorForm(item){
-  openModal(`<h3>新增樓層 — ${esc(item)} <span class="x" onclick="closeModal()">×</span></h3>
-    <input type="hidden" id="pgItem" value="${esc(item)}">
-    <label class="fld"><span>樓層</span><input class="inp" id="pgFloor" placeholder="例：4F-B區"></label>
-    <label class="fld"><span>目前進度 %</span><input class="inp" id="pgPct" type="number" inputmode="numeric" value="0"></label>
-    <button class="btn full" onclick="addProgFromForm()">新增</button>`);
+function setProgPctCard(id,v){ const p=progById(id); if(p){ p.percent=Math.max(0,Math.min(100,parseInt(v)||0)); saveState(); renderProg(); } }
+function delProgCard(id){ if(!confirm('刪除此進度項？'))return; delProg(id); closeModal(); }
+function openProgAdd(){
+  const opts=['<option value="">選擇工項</option>',...workList().map(w=>`<option>${esc(w)}</option>`)].join('');
+  openModal(`<h3>新增進度項 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>工項</span><select class="inp" id="paWork">${opts}</select></label>
+    <label class="fld"><span>樓層/區域</span><input class="inp" id="paFloor" placeholder="例：3F-A區"></label>
+    <label class="fld"><span>目前進度 %</span><input class="inp" id="paPct" type="number" inputmode="numeric" value="0"></label>
+    <button class="btn full" onclick="addProgDirect()">新增</button>`);
 }
-function addProgFromForm(){
-  const item=(document.getElementById('pgItem').value||'').trim();
-  const floor=(document.getElementById('pgFloor').value||'').trim();
-  let pct=parseInt(document.getElementById('pgPct').value)||0; pct=Math.max(0,Math.min(100,pct));
-  if(!item) return toast('請輸入工項名稱');
-  if(!floor) return toast('請輸入樓層');
-  progStore().push({id:uid(), item, floor, percent:pct});
+function addProgDirect(){
+  const work=(document.getElementById('paWork').value||'').trim();
+  const floor=(document.getElementById('paFloor').value||'').trim();
+  let pct=parseInt(document.getElementById('paPct').value)||0; pct=Math.max(0,Math.min(100,pct));
+  if(!work) return toast('請選擇工項');
+  const p=upsertProgress(work, floor, ''); p.percent=pct;
   saveState(); closeModal(); renderProg();
 }
 
@@ -888,7 +1066,7 @@ async function importBackup(input){
   if(!backup || !backup.state || !backup.state.sites || !backup.state.sites.length){ input.value=''; return toast('這不是有效的備份檔'); }
   input.value='';
   if(!confirm('還原會「覆蓋」目前 App 內的所有資料，確定要還原嗎？')) return;
-  state=backup.state; saveState();
+  state=migrateState(backup.state); saveState();
   if(!state.sites.find(s=>s.id===state.activeSiteId)) state.activeSiteId=state.sites[0].id;
   if(backup.photos && backup.photos.length){
     toast('正在還原照片…');
@@ -916,7 +1094,7 @@ function registerSW(){
 }
 
 /* =================== init =================== */
-function renderAll(){ renderSiteSelect(); renderCalendar(); renderDayLogs(); renderProg(); renderMat(); }
+function renderAll(){ renderSiteSelect(); renderCalendar(); renderDay(); renderProg(); renderMat(); }
 function init(){ setupPWA(); registerSW(); renderAll(); }
 init();
 </script>
