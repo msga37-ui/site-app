@@ -140,10 +140,36 @@ textarea.inp{resize:vertical; min-height:60px}
 .mat-item .qty-row{display:flex; gap:8px; margin-top:7px}
 .mat-item .qty-row label{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text2); font-weight:600}
 .mat-item input.qty{width:62px; text-align:center; padding:7px 4px}
-.diff{font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px}
+.diff{font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px; white-space:nowrap}
 .diff.ok{background:rgba(52,199,89,.15); color:#1a8c3a}
 .diff.short{background:rgba(255,59,48,.13); color:var(--red)}
 .diff.over{background:rgba(255,149,0,.15); color:#a85d00}
+
+/* ===== 材料品項群組（多規格） ===== */
+.mat-group{padding:12px 2px; border-bottom:1px solid var(--border)}
+.mg-head{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.mg-head .t{font-weight:700; font-size:15px}
+.mg-head .t small{color:var(--text2); font-weight:500; font-size:12px; margin-left:2px}
+.perbox{display:flex; align-items:center; gap:3px; font-size:12px; color:var(--text2); font-weight:600; flex:none}
+.perbox input{width:42px; text-align:center; padding:4px; background:var(--inp); border:1px solid var(--border); border-radius:7px; color:var(--text)}
+.spec-row{background:var(--inp); border-radius:11px; padding:9px 10px; margin-top:8px}
+.spec-top{display:flex; align-items:center; gap:8px}
+.spec-top .chk.sm{width:22px; height:22px; border-radius:6px; border:2px solid var(--border); flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px}
+.spec-top .chk.sm.on{background:var(--green); border-color:var(--green)}
+.spec-top input.spec-label{flex:1; min-width:0; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:7px 9px; color:var(--text); font-weight:600; font-size:14px}
+.spec-top .del{font-size:15px; padding:4px 6px; flex:none; opacity:.6}
+.spec-q{display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap}
+.spec-q label{display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text2); font-weight:600}
+.spec-q input{width:62px; text-align:center; padding:7px 4px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text)}
+.box-hint{font-size:11px; color:var(--text2); margin-top:6px}
+.presets{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+.preset-chip{font-size:12px; padding:5px 10px; border-radius:999px; background:var(--inp); border:1px dashed var(--blue); color:var(--blue); font-weight:600}
+
+/* ===== 照片縮圖 ===== */
+.photo-strip{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px}
+.photo-strip .thumb{position:relative; width:74px; height:74px; border-radius:10px; overflow:hidden; border:1px solid var(--border)}
+.photo-strip .thumb img{width:100%; height:100%; object-fit:cover; display:block}
+.photo-strip .thumb-x{position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center}
 
 /* ===== 算料 ===== */
 .seg{display:flex; background:var(--inp); border-radius:10px; padding:3px; margin-bottom:12px}
@@ -252,17 +278,41 @@ const ITEM_COLOR = {
 };
 const COLOR_HEX = {blue:'#007AFF', orange:'#FF9500', red:'#FF3B30'};
 
-// 材料點收：分類與品項
+// 材料點收：分類 → 品項（unit=計量單位；perBox=每箱支數(箱裝品項)；presets=常見規格快選）
 const MAT_CATS = [
-  {key:'frame', name:'隔間/天花骨架', items:['上下槽','立柱','加強橫支','大百葉','蜈蚣腳','收邊','大T','小T','吊筋']},
-  {key:'board', name:'板材類', items:['石膏板','矽酸鈣板','纖維水泥板','明架天花板','鋁企口','PVC']},
-  {key:'extra', name:'副資材與耗材', items:['岩棉','玻璃棉','護角','加強鐵片','水泥','保麗龍','檢修口']},
+  {key:'frame', name:'隔間/天花骨架', items:[
+    {name:'上下槽', unit:'支', presets:['3m','4m']},
+    {name:'立柱', unit:'支', presets:['50mm×3m','65mm×3m','75mm×3m','92mm×3m','75mm×4m','92mm×4m']},
+    {name:'加強橫支', unit:'支', presets:['3m','4m']},
+    {name:'大百葉', unit:'支', presets:['12尺','10尺']},
+    {name:'蜈蚣腳', unit:'支', presets:['12尺','10.8尺']},
+    {name:'暗架收邊', unit:'支', presets:['8尺','10尺','12尺']},
+    {name:'明架收邊', unit:'支', perBox:40, presets:['10尺','12尺']},
+    {name:'大T', unit:'支', perBox:50, presets:['12尺']},
+    {name:'小T', unit:'支', perBox:75, presets:['4尺','2尺']},
+    {name:'吊筋', unit:'支', presets:['3尺','4尺','6尺']},
+  ]},
+  {key:'board', name:'板材類', items:[
+    {name:'石膏板', unit:'片', presets:['9mm','12mm','15mm']},
+    {name:'矽酸鈣板', unit:'片', presets:['6mm','8mm','9mm','12mm']},
+    {name:'纖維水泥板', unit:'片', presets:['6mm','8mm','9mm']},
+    {name:'明架天花板', unit:'箱', presets:[]},
+    {name:'鋁企口', unit:'片', presets:[]},
+    {name:'PVC', unit:'片', presets:[]},
+  ]},
+  {key:'extra', name:'副資材與耗材', items:[
+    {name:'岩棉', unit:'包', presets:['60x120','60x100']},
+    {name:'玻璃棉', unit:'包', presets:[]},
+    {name:'護角', unit:'支', presets:[]},
+    {name:'加強鐵片', unit:'片', presets:[]},
+    {name:'水泥', unit:'包', presets:[]},
+    {name:'保麗龍', unit:'包', presets:[]},
+    {name:'檢修口', unit:'個', presets:['45×45','60×60']},
+  ]},
 ];
-const MAT_UNIT = {
-  '上下槽':'支','立柱':'支','加強橫支':'支','大百葉':'支','蜈蚣腳':'支','收邊':'支','大T':'支','小T':'支','吊筋':'支',
-  '石膏板':'片','矽酸鈣板':'片','纖維水泥板':'片','明架天花板':'箱','鋁企口':'片','PVC':'片',
-  '岩棉':'包','玻璃棉':'包','護角':'支','加強鐵片':'片','水泥':'包','保麗龍':'包','檢修口':'個'
-};
+// 依品項名稱快速查設定
+const MAT_DEF = {};
+MAT_CATS.forEach(c=>c.items.forEach(it=>{ MAT_DEF[it.name]={...it, cat:c.key}; }));
 
 // 算料工法 → 預設係數（每坪數量，可編輯；預設僅供參考，請依實際叫貨微調）
 const DEFAULT_COEFFS = {
@@ -415,6 +465,7 @@ function renderDayLogs(){
   if(!logs.length){ box.innerHTML=`<div class="empty">這天還沒有日誌<br>點右上「＋ 新增日誌」開始記錄</div>`; return; }
   box.innerHTML=logs.map(l=>{
     const chips=(l.items||[]).map(it=>`<span class="chip c-${ITEM_COLOR[it]||'blue'}">${esc(it)}</span>`).join('');
+    const photoStrip=(l.photos&&l.photos.length)?`<div class="photo-strip" id="ph-${l.id}"></div>`:'';
     return `<div class="log-card">
       <div class="lc-top">
         <div style="font-weight:700">${esc(l.floor||'未填樓層')} · ${esc(l.vendor||'未填廠商')}</div>
@@ -422,18 +473,36 @@ function renderDayLogs(){
       </div>
       <div class="lc-meta">進場人數：${esc(l.headcount||'-')} 人${l.note?' ｜ '+esc(l.note):''}</div>
       <div class="chips">${chips||'<span class="muted">未選工項</span>'}</div>
+      ${photoStrip}
       <div style="margin-top:10px;display:flex;gap:8px">
         <button class="btn ghost sm" onclick="openLogForm('${l.id}')">編輯</button>
         <button class="btn gray sm" onclick="delLog('${l.id}')">刪除</button>
       </div>
     </div>`;
   }).join('');
+  loadCardThumbs(logs);
 }
+async function loadCardThumbs(logs){
+  for(const l of logs){
+    if(!l.photos||!l.photos.length) continue;
+    const el=document.getElementById('ph-'+l.id); if(!el) continue;
+    let h='';
+    for(const pid of l.photos){
+      try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); h+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){}
+    }
+    el.innerHTML=h;
+  }
+}
+function viewPhoto(u){ openModal(`<div style="text-align:center"><img src="${u}" style="max-width:100%;border-radius:12px"><button class="btn full" style="margin-top:14px" onclick="closeModal()">關閉</button></div>`); }
 
 /* 日誌表單 */
-function openLogForm(id){
+let _logPhotos=[];       // 目前表單照片 [{id, blob?, url}]
+let _origPhotoIds=[];    // 編輯前已存在的照片 id
+async function openLogForm(id){
   const editing = id ? state.logs.find(l=>l.id===id) : null;
   const cur = editing || {date:view.selDate, vendor:'', floor:'', headcount:'', items:[], note:''};
+  _origPhotoIds = (editing&&editing.photos)?editing.photos.slice():[];
+  _logPhotos=[];
   const opts = LOG_ITEMS.map(it=>`<button type="button" class="opt${(cur.items||[]).includes(it)?' on':''}" data-it="${esc(it)}" onclick="this.classList.toggle('on')">${esc(it)}</button>`).join('');
   openModal(`<h3>${editing?'編輯':'新增'}施工日誌 <span class="x" onclick="closeModal()">×</span></h3>
     <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
@@ -445,10 +514,31 @@ function openLogForm(id){
     </div>
     <label class="fld"><span>施工項目（可多選）</span></label>
     <div class="item-pick" id="lfItems">${opts}</div>
-    <label class="fld" style="margin-top:12px"><span>備註</span><textarea class="inp" id="lfNote" placeholder="補充說明…">${esc(cur.note)}</textarea></label>
+    <label class="fld" style="margin-top:12px"><span>現場照片</span></label>
+    <div class="photo-strip" id="lfPhotos"></div>
+    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選照片
+      <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addLogPhotos(this.files);this.value=''">
+    </label>
+    <label class="fld"><span>備註</span><textarea class="inp" id="lfNote" placeholder="補充說明…">${esc(cur.note)}</textarea></label>
     <button class="btn full" onclick="saveLog(${editing?`'${id}'`:'null'})">儲存日誌</button>`);
+  for(const pid of _origPhotoIds){
+    try{ const rec=await photoGet(pid); if(rec&&rec.blob) _logPhotos.push({id:pid, url:URL.createObjectURL(rec.blob)}); }catch(e){}
+  }
+  renderLogPhotoStrip();
 }
-function saveLog(id){
+function renderLogPhotoStrip(){
+  const el=document.getElementById('lfPhotos'); if(!el)return;
+  el.innerHTML=_logPhotos.length
+    ? _logPhotos.map((p,i)=>`<div class="thumb"><img src="${p.url}"><button class="thumb-x" onclick="removeLogPhoto(${i})">×</button></div>`).join('')
+    : '<span class="muted">尚無照片</span>';
+}
+function addLogPhotos(files){
+  [...files].forEach(f=>{ _logPhotos.push({id:uid(), blob:f, url:URL.createObjectURL(f)}); });
+  renderLogPhotoStrip();
+}
+function removeLogPhoto(i){ const p=_logPhotos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _logPhotos.splice(i,1); renderLogPhotoStrip(); }
+
+async function saveLog(id){
   const items=[...document.querySelectorAll('#lfItems .opt.on')].map(b=>b.dataset.it);
   const data={
     date:document.getElementById('lfDate').value||todayStr(),
@@ -457,13 +547,21 @@ function saveLog(id){
     headcount:document.getElementById('lfHead').value.trim(),
     items, note:document.getElementById('lfNote').value.trim(),
   };
+  for(const p of _logPhotos){ if(p.blob){ try{ await photoPut(p.id, p.blob, {date:data.date}); }catch(e){} } }
+  data.photos=_logPhotos.map(p=>p.id);
+  for(const oid of _origPhotoIds){ if(!data.photos.includes(oid)){ try{ await photoDel(oid); }catch(e){} } }
   if(id){ Object.assign(state.logs.find(l=>l.id===id), data); }
   else { state.logs.push({id:uid(), siteId:state.activeSiteId, ...data}); }
   view.selDate=data.date;
   saveState(); closeModal(); renderCalendar(); renderDayLogs();
   toast('日誌已儲存');
 }
-function delLog(id){ if(!confirm('刪除此筆日誌？'))return; state.logs=state.logs.filter(l=>l.id!==id); saveState(); renderCalendar(); renderDayLogs(); }
+function delLog(id){
+  if(!confirm('刪除此筆日誌？'))return;
+  const l=state.logs.find(x=>x.id===id);
+  if(l&&l.photos) l.photos.forEach(pid=>photoDel(pid).catch(()=>{}));
+  state.logs=state.logs.filter(l=>l.id!==id); saveState(); renderCalendar(); renderDayLogs();
+}
 
 /* LINE 分享 */
 function lineText(l){
@@ -472,59 +570,127 @@ function lineText(l){
 async function shareLine(id){
   const l=state.logs.find(x=>x.id===id); if(!l)return;
   const txt=lineText(l);
+  let files=[];
+  if(l.photos&&l.photos.length){
+    for(const pid of l.photos){
+      try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob], pid+'.'+ext, {type:t})); } }catch(e){}
+    }
+  }
   try{ await navigator.clipboard.writeText(txt); }catch(e){}
   if(navigator.share){
-    try{ await navigator.share({text:txt}); return; }catch(e){ if(e.name==='AbortError')return; }
+    const payload={text:txt};
+    if(files.length && navigator.canShare && navigator.canShare({files})) payload.files=files;
+    try{ await navigator.share(payload); return; }catch(e){ if(e.name==='AbortError')return; }
   }
-  toast('已複製，貼到 LINE 群組即可');
+  toast(files.length?'文字已複製（此裝置不支援帶圖分享，請手動加圖）':'已複製，貼到 LINE 群組即可');
 }
 
 /* =================== 材料點收 =================== */
+// 資料模型：materials[sid] = { items: { 品項名:{ perBox:每箱支數|null, specs:[{id,label,ordered,actual,checked}] } } }
 function matStore(){
   const sid=state.activeSiteId;
-  if(!state.materials[sid]) state.materials[sid]={ordered:{},actual:{},checked:{}};
-  return state.materials[sid];
+  let m=state.materials[sid];
+  if(!m){ m=state.materials[sid]={items:{}}; return m; }
+  if(!m.items){ // 舊格式 {ordered,actual,checked} → 自動轉新格式
+    const old=m, items={};
+    const names=new Set([...Object.keys(old.ordered||{}),...Object.keys(old.actual||{}),...Object.keys(old.checked||{})]);
+    names.forEach(nm=>{
+      const target = nm==='收邊' ? '暗架收邊' : nm; // 舊「收邊」併到「暗架收邊」
+      const def=MAT_DEF[target]||{};
+      if(!items[target]) items[target]={perBox:def.perBox||null, specs:[]};
+      items[target].specs.push({id:uid(), label:'一般',
+        ordered:(old.ordered&&old.ordered[nm]!=null)?old.ordered[nm]:'',
+        actual:(old.actual&&old.actual[nm]!=null)?old.actual[nm]:'',
+        checked:!!(old.checked&&old.checked[nm])});
+    });
+    m=state.materials[sid]={items};
+  }
+  return m;
 }
+function matItem(name){
+  const m=matStore();
+  if(!m.items[name]){ const def=MAT_DEF[name]||{}; m.items[name]={perBox:(def.perBox||null), specs:[]}; }
+  return m.items[name];
+}
+function f2(n){ return Math.round((+n||0)*100)/100; }
+
 function renderMat(){
   const nav=document.getElementById('matNav');
   nav.innerHTML=MAT_CATS.map(c=>`<button class="${c.key===view.matCat?'on':''}" onclick="view.matCat='${c.key}';renderMat()">${esc(c.name)}</button>`).join('');
   const q=document.getElementById('matSearch').value.trim();
   const store=matStore();
-  // 把已存在但不在預設清單的品項（例如匯入的自訂材料）併入「副資材與耗材」顯示
-  const known=new Set(); MAT_CATS.forEach(c=>c.items.forEach(i=>known.add(i)));
-  const orphans=[...new Set([...Object.keys(store.ordered),...Object.keys(store.actual),...Object.keys(store.checked||{})])].filter(k=>!known.has(k));
-  const CATS = MAT_CATS.map(c=> c.key==='extra' ? {...c, items:[...c.items, ...orphans]} : c);
-  let cats = q ? CATS : CATS.filter(c=>c.key===view.matCat);
-  if(q){ nav.style.opacity=.4; } else { nav.style.opacity=1; }
+  const catalog=new Set(Object.keys(MAT_DEF));
+  const orphans=Object.keys(store.items).filter(n=>!catalog.has(n)); // 舊資料殘留的非清單品項
+  let cats = q ? MAT_CATS : MAT_CATS.filter(c=>c.key===view.matCat);
+  nav.style.opacity = q ? .4 : 1;
   let html='';
   cats.forEach(c=>{
-    const items=c.items.filter(it=> !q || it.includes(q));
-    if(!items.length) return;
-    if(q) html+=`<div class="muted" style="font-weight:700;margin:8px 2px 2px">${esc(c.name)}</div>`;
-    items.forEach(it=>{
-      const ordered=store.ordered[it]!=null?store.ordered[it]:'';
-      const actual=store.actual[it]!=null?store.actual[it]:'';
-      const on=store.checked[it];
-      const unit=MAT_UNIT[it]||'';
-      const diff = (ordered!==''&&actual!=='') ? (actual-ordered) : null;
-      const diffTag = diff!=null ? `<span class="diff ${diff===0?'ok':(diff<0?'short':'over')}">${diff===0?'✓ 符合':(diff<0?'缺'+Math.abs(Math.round(diff*100)/100):'多'+Math.round(diff*100)/100)}</span>` : '';
-      html+=`<div class="mat-item">
-        <div class="chk${on?' on':''}" onclick="toggleMat('${esc(it)}')">${on?'✓':''}</div>
-        <div style="flex:1;min-width:0">
-          <div class="nm">${esc(it)} <small>${esc(unit)}</small> ${diffTag}</div>
-          <div class="qty-row">
-            <label>已訂<input class="inp qty" type="number" inputmode="decimal" placeholder="—" value="${ordered}" onchange="setMatOrdered('${esc(it)}',this.value)"></label>
-            <label>實際<input class="inp qty" type="number" inputmode="decimal" placeholder="—" value="${actual}" onchange="setMatActual('${esc(it)}',this.value)"></label>
-          </div>
-        </div>
-      </div>`;
+    let names=c.items.map(it=>it.name);
+    if(c.key==='extra') names=[...names,...orphans];
+    let groupHtml='';
+    names.forEach(name=>{
+      if(q){
+        const grp=store.items[name];
+        const hit = name.includes(q) || (grp&&grp.specs.some(s=>(s.label||'').includes(q)));
+        if(!hit) return;
+      }
+      groupHtml+=renderMatGroup(name);
     });
+    if(!groupHtml) return;
+    if(q) html+=`<div class="muted" style="font-weight:700;margin:10px 2px 2px">${esc(c.name)}</div>`;
+    html+=groupHtml;
   });
   document.getElementById('matList').innerHTML=html||`<div class="empty">查無品項</div>`;
 }
-function toggleMat(it){ const s=matStore(); s.checked[it]=!s.checked[it]; saveState(); renderMat(); }
-function setMatOrdered(it,v){ const s=matStore(); if(v==='')delete s.ordered[it]; else s.ordered[it]=parseFloat(v)||0; saveState(); renderMat(); }
-function setMatActual(it,v){ const s=matStore(); if(v==='')delete s.actual[it]; else s.actual[it]=parseFloat(v)||0; if(s.actual[it]!=null) s.checked[it]=true; saveState(); renderMat(); }
+function renderMatGroup(name){
+  const def=MAT_DEF[name]||{unit:'',presets:[]};
+  const grp=matStore().items[name];
+  const specs=grp?grp.specs:[];
+  const perBox = grp ? grp.perBox : (def.perBox||null);
+  const isBox = perBox && perBox>0;
+  const unit=def.unit||'';
+  const boxCfg = isBox
+    ? `<span class="perbox">每箱<input type="number" inputmode="numeric" value="${perBox}" onchange="setPerBox('${esc(name)}',this.value)">支</span>` : '';
+  let rows='';
+  specs.forEach(s=>{
+    const ordered=(s.ordered!=null&&s.ordered!=='')?s.ordered:'';
+    const actual=(s.actual!=null&&s.actual!=='')?s.actual:'';
+    const diff=(ordered!==''&&actual!=='')?(actual-ordered):null;
+    const diffTag=diff!=null?`<span class="diff ${diff===0?'ok':(diff<0?'short':'over')}">${diff===0?'✓符合':(diff<0?'缺'+f2(-diff):'多'+f2(diff))}</span>`:'';
+    const qLabel=isBox?'(箱)':'';
+    const boxHint=isBox?`<div class="box-hint">已訂 ${f2((ordered||0)*perBox)} 支 ／ 實際 ${f2((actual||0)*perBox)} 支</div>`:'';
+    rows+=`<div class="spec-row">
+      <div class="spec-top">
+        <div class="chk sm${s.checked?' on':''}" onclick="toggleSpecChk('${esc(name)}','${s.id}')">${s.checked?'✓':''}</div>
+        <input class="spec-label" value="${esc(s.label||'')}" placeholder="規格(如 ${esc((def.presets&&def.presets[0])||'12mm')})" onchange="setSpec('${esc(name)}','${s.id}','label',this.value)">
+        <button class="del" onclick="delSpec('${esc(name)}','${s.id}')">🗑</button>
+      </div>
+      <div class="spec-q">
+        <label>已訂${qLabel}<input type="number" inputmode="decimal" placeholder="—" value="${ordered}" onchange="setSpec('${esc(name)}','${s.id}','ordered',this.value)"></label>
+        <label>實際${qLabel}<input type="number" inputmode="decimal" placeholder="—" value="${actual}" onchange="setSpec('${esc(name)}','${s.id}','actual',this.value)"></label>
+        ${diffTag}
+      </div>
+      ${boxHint}
+    </div>`;
+  });
+  const chips=(def.presets||[]).map(p=>`<button class="preset-chip" onclick="addSpec('${esc(name)}','${esc(p)}')">＋${esc(p)}</button>`).join('')
+    + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂</button>`;
+  return `<div class="mat-group">
+    <div class="mg-head"><div class="t">${esc(name)} <small>${esc(unit)}</small></div>${boxCfg}</div>
+    ${rows}
+    <div class="presets">${chips}</div>
+  </div>`;
+}
+function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); renderMat(); }
+function delSpec(name,sid){ const it=matStore().items[name]; if(!it)return; it.specs=it.specs.filter(s=>s.id!==sid); saveState(); renderMat(); }
+function setSpec(name,sid,field,v){
+  const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(!s)return;
+  if(field==='label'){ s.label=v; }
+  else { s[field]=(v===''?'':(parseFloat(v)||0)); if(field==='actual'&&v!=='') s.checked=true; }
+  saveState(); renderMat();
+}
+function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
+function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
 
 /* =================== PWA manifest（inline，免額外檔） =================== */
 function setupPWA(){
