@@ -201,6 +201,25 @@ textarea.inp{resize:vertical; min-height:60px}
 .work-chip{font-size:13px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--inp); border:1px solid var(--border)}
 .work-chip.done{background:rgba(52,199,89,.15); color:#1a8c3a; border-color:transparent; font-weight:700}
 
+/* ===== 進度頁（範本式：膠囊+漸層） ===== */
+.prog-summary{padding:14px}
+.grad-bar{height:14px; border-radius:999px; background:var(--inp); overflow:hidden; margin-top:10px}
+.grad-fill{height:100%; border-radius:999px; background:linear-gradient(90deg,#ffd2e3,#ff2d78); min-width:2px}
+.prog-sect{padding:14px 2px 12px; border-bottom:1px solid var(--border)}
+.ps-head{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer}
+.ps-name{font-weight:800; font-size:16px; color:var(--blue)}
+.ps-meta{font-size:13px; color:var(--text2); font-weight:600; display:flex; align-items:center; gap:5px; white-space:nowrap}
+.ps-meta b{color:var(--text); font-size:15px}
+.ps-caret{color:var(--text2); font-size:12px}
+.thin-bar{height:8px; border-radius:999px; background:var(--inp); overflow:hidden; margin:8px 0}
+.thin-fill{height:100%; border-radius:999px; background:var(--blue); transition:width .15s}
+.thin-fill.full{background:var(--green)}
+.floor-pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+.floor-pill{font-size:13px; font-weight:700; padding:7px 13px; border-radius:999px; border:1.5px solid var(--border)}
+.floor-pill.zero{color:var(--text2); background:var(--inp); opacity:.65}
+.floor-pill.active{color:var(--text); background:var(--card); border-color:var(--text2)}
+.floor-pill.done{color:#1a8c3a; background:rgba(52,199,89,.18); border-color:transparent}
+
 /* ===== 記錄卡片 / 表單項目 ===== */
 .rc-items{display:flex; flex-direction:column; gap:6px}
 .rc-line{display:flex; align-items:center; gap:6px; font-size:14px; flex-wrap:wrap}
@@ -286,11 +305,11 @@ textarea.inp{resize:vertical; min-height:60px}
 <!-- ============ 進度 ============ -->
 <div class="screen" id="screen-prog">
   <div id="progSummary"></div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 12px;gap:8px">
-    <div style="font-weight:800;font-size:17px">工項進度（依樓層）</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 2px 12px;gap:8px">
+    <button class="btn ghost sm" id="progViewBtn" onclick="toggleProgView()">依工項</button>
     <div style="display:flex;gap:8px">
       <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
-      <button class="btn sm" onclick="openProgAdd()">＋</button>
+      <button class="btn sm" onclick="openProgAdd()">＋ 工項</button>
     </div>
   </div>
   <div id="progList"></div>
@@ -417,7 +436,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
+let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progView:'work', workCollapsed:{}, floorCollapsed:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -1065,96 +1084,78 @@ async function shareOrder(id){
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
 function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
+function headcountByWork(work){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p&&p.work===work)t+=(+it.headcount||0); })); return Math.round(t*10)/10; }
+function vendorByWork(work){ const set=new Set(); progStore().forEach(p=>{ if(p.work===work&&p.vendor)set.add(p.vendor); }); return [...set].join('、'); }
+function vendorHeadcounts(){ const map={}, order=[]; recStore().forEach(r=>{ const k=r.vendor||'(未填廠商)'; (r.items||[]).forEach(it=>{ if(!(k in map)){map[k]=0;order.push(k);} map[k]+=(+it.headcount||0); }); }); return {map,order}; }
 function toggleProgEdit(){
   view.progEdit=!view.progEdit;
   const b=document.getElementById('progEditBtn');
   b.textContent=view.progEdit?'完成':'編輯'; b.classList.toggle('green',view.progEdit);
   renderProg();
 }
-function setProgView(v){ view.progView=v; renderProg(); }
+function toggleProgView(){ view.progView = view.progView==='floor'?'work':'floor'; renderProg(); }
 function floorOrderNum(f){ const m=String(f).match(/^([BR]?)(\d+)/i); if(!m) return 99999; let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; return n; }
 function renderProgSummary(){
   const list=progStore();
   const avg=list.length?Math.round(list.reduce((t,p)=>t+(+p.percent||0),0)/list.length):0;
-  const vendors=vendorList().join('、')||activeSite().name;
-  document.getElementById('progSummary').innerHTML=`<div class="card" style="padding:14px">
-    <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <div><div style="font-weight:700">${esc(vendors)}</div><div class="muted">總出工 ${totalHeadcount()} 人</div></div>
-      <div style="font-size:26px;font-weight:800;color:var(--blue)">${avg}%</div>
+  const {map,order}=vendorHeadcounts();
+  const vstr = order.length ? order.map(v=>`${esc(v)} 總出工${Math.round(map[v]*10)/10}人`).join('　') : esc(activeSite().name);
+  document.getElementById('progSummary').innerHTML=`<div class="card prog-summary">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div class="muted" style="font-size:13px;line-height:1.6;flex:1">${vstr}</div>
+      <div style="font-size:24px;font-weight:800;color:#FF2D78">${avg}%</div>
     </div>
-    <div class="prog-bar" style="height:12px;margin-top:8px"><div class="prog-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
+    <div class="grad-bar"><div class="grad-fill" style="width:${avg}%"></div></div>
   </div>`;
 }
-function mergeDoneFloors(entries){ // entries:[{id,floor}] 皆 100%
-  const numbered=[], singles=[];
-  entries.forEach(e=>{ const m=String(e.floor).match(/^([BR]?)(\d+)F$/i); if(m){ let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; numbered.push({...e,n}); } else singles.push({label:e.floor||'(未填)', ids:[e.id]}); });
-  numbered.sort((a,b)=>a.n-b.n);
-  const out=[]; let i=0;
-  while(i<numbered.length){ let j=i; const ids=[numbered[i].id]; while(j+1<numbered.length && numbered[j+1].n===numbered[j].n+1){ j++; ids.push(numbered[j].id); } out.push({label: j>i?`${numbered[i].floor}-${numbered[j].floor}`:numbered[i].floor, ids}); i=j+1; }
-  return [...out,...singles];
-}
-function idsAttr(ids){ return esc(JSON.stringify(ids)); }
 function renderProg(){
-  const seg=document.getElementById('progViewSeg');
-  if(seg){ seg.querySelector('[data-v=work]').classList.toggle('on',view.progView!=='floor'); seg.querySelector('[data-v=floor]').classList.toggle('on',view.progView==='floor'); }
+  const vb=document.getElementById('progViewBtn'); if(vb) vb.textContent = view.progView==='floor'?'依樓層':'依工項';
   renderProgSummary();
   const list=progStore();
   const box=document.getElementById('progList');
-  if(!list.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現<br>（或點右上「＋」直接新增進度項）</div>`; return; }
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現<br>（或點右上「＋ 工項」直接新增）</div>`; return; }
   box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
 }
-function progBar(p){
-  const v=Math.max(0,Math.min(100,+p.percent||0));
-  return `<div class="prog-row">
-    <div class="prog-rowtop"><span class="prog-floor">${esc(p.floor||'(未填樓層)')}</span><span class="prog-pct" id="pct-${p.id}">${v}%</span>${view.progEdit?`<button class="del" onclick="delProg('${p.id}')">🗑</button>`:''}</div>
-    <div class="prog-bar"><div class="prog-fill${v>=100?' full':''}" id="fill-${p.id}" style="width:${v}%"></div></div>
-    <input class="prog-slider" type="range" min="0" max="100" step="5" value="${v}" oninput="onProgSlide('${p.id}',this.value)" onchange="setProgPct('${p.id}',this.value)">
+function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgCard('${p.id}')">${esc(p.floor||'?')} ${v}%</span>`; }
+function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgCard('${p.id}')">${esc(p.work)} ${v}%</span>`; }
+function progSect(name, kind, avg, meta, collapsed, pillsHtml, delFn){
+  const caret=collapsed?'▶':'▼';
+  const del=view.progEdit?` <button class="del" onclick="event.stopPropagation();${delFn}">🗑</button>`:'';
+  return `<div class="prog-sect">
+    <div class="ps-head" onclick="${kind}">
+      <span class="ps-name">${esc(name)}</span>
+      <span class="ps-meta">${meta?esc(meta)+' ':''}<b>${avg}%</b>${del} <span class="ps-caret">${caret}</span></span>
+    </div>
+    <div class="thin-bar"><div class="thin-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
+    ${collapsed?'':`<div class="floor-pills">${pillsHtml}</div>`}
   </div>`;
 }
 function progHtmlByWork(list){
   const groups={}, order=[];
-  list.forEach(p=>{ if(!groups[p.work]){ groups[p.work]=[]; order.push(p.work); } groups[p.work].push(p); });
+  list.forEach(p=>{ if(!groups[p.work]){groups[p.work]=[];order.push(p.work);} groups[p.work].push(p); });
   return order.map(work=>{
-    const g=groups[work];
+    const g=groups[work]; g.sort((a,b)=>floorOrderNum(a.floor)-floorOrderNum(b.floor));
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
-    const active=[], done=[];
-    g.forEach(p=>{ ((+p.percent||0)>=100 && !view.progExpanded[p.id]) ? done.push(p) : active.push(p); });
-    active.sort((a,b)=>floorOrderNum(a.floor)-floorOrderNum(b.floor));
-    const bars=active.map(progBar).join('');
-    const merged=mergeDoneFloors(done.map(p=>({id:p.id,floor:p.floor})));
-    const tags=merged.length?`<div class="done-tags">`+merged.map(m=>`<span class="done-tag" onclick="expandProgIds(${idsAttr(m.ids)})">${esc(m.label)} ✓${view.progEdit?`<b onclick="event.stopPropagation();delProgIds(${idsAttr(m.ids)})">×</b>`:''}</span>`).join('')+`</div>`:'';
-    return `<div class="card prog-group">
-      <div class="pg-head"><div class="pg-title">${esc(work||'(未命名)')}</div><div class="pg-avg"><span class="pg-avgnum">${avg}%</span></div></div>
-      ${bars}${tags}
-    </div>`;
+    const hc=headcountByWork(work);
+    const meta=[vendorByWork(work), hc?hc+'人':''].filter(Boolean).join(' ');
+    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''), `delWorkGroup('${esc(work)}')`);
   }).join('');
 }
 function progHtmlByFloor(list){
   const groups={}, order=[];
-  list.forEach(p=>{ const f=p.floor||'(未填樓層)'; if(!groups[f]){ groups[f]=[]; order.push(f); } groups[f].push(p); });
+  list.forEach(p=>{ const f=p.floor||'(未填樓層)'; if(!groups[f]){groups[f]=[];order.push(f);} groups[f].push(p); });
   order.sort((a,b)=>floorOrderNum(a)-floorOrderNum(b));
   return order.map(floor=>{
     const g=groups[floor];
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
-    const open=view.floorExpanded[floor];
-    const chips=g.map(p=>{ const done=(+p.percent||0)>=100; return `<span class="work-chip${done?' done':''}" onclick="openProgCard('${p.id}')">${esc(p.work)}${done?' ✓':' '+(p.percent||0)+'%'}</span>`; }).join('');
-    return `<div class="card prog-group">
-      <div class="pg-head" onclick="toggleFloor('${esc(floor)}')" style="cursor:pointer">
-        <div class="pg-title">${esc(floor)} <span style="color:var(--text2);font-size:12px">${open?'▼':'▶'}</span></div>
-        <div class="pg-avg"><span class="pg-avgnum">${avg}%</span></div>
-      </div>
-      <div class="prog-bar" style="margin-top:4px"><div class="prog-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
-      ${open?`<div class="work-chips">${chips}</div>`:''}
-    </div>`;
+    return progSect(floor, `toggleFloorC('${esc(floor)}')`, avg, '', view.floorCollapsed[floor], g.map(workPill).join(''), `delFloorGroup('${esc(floor)}')`);
   }).join('');
 }
-function toggleFloor(f){ view.floorExpanded[f]=!view.floorExpanded[f]; renderProg(); }
-function onProgSlide(id,v){ const pct=document.getElementById('pct-'+id), fill=document.getElementById('fill-'+id); if(pct)pct.textContent=v+'%'; if(fill){ fill.style.width=v+'%'; fill.classList.toggle('full',(+v)>=100); } }
-function setProgPct(id,v){ const p=progById(id); if(!p)return; p.percent=Math.max(0,Math.min(100,parseInt(v)||0)); if(p.percent<100)delete view.progExpanded[id]; saveState(); renderProg(); }
-function expandProg(id){ view.progExpanded[id]=true; renderProg(); }
-function expandProgIds(ids){ (ids||[]).forEach(id=>view.progExpanded[id]=true); renderProg(); }
-function delProg(id){ state.progress[state.activeSiteId]=progStore().filter(p=>p.id!==id); delete view.progExpanded[id]; saveState(); renderProg(); }
-function delProgIds(ids){ if(!confirm('刪除這些已完成樓層的進度？'))return; const set=new Set(ids); state.progress[state.activeSiteId]=progStore().filter(p=>!set.has(p.id)); saveState(); renderProg(); }
+function toggleWork(w){ view.workCollapsed[w]=!view.workCollapsed[w]; renderProg(); }
+function toggleFloorC(f){ view.floorCollapsed[f]=!view.floorCollapsed[f]; renderProg(); }
+function delProg(id){ state.progress[state.activeSiteId]=progStore().filter(p=>p.id!==id); saveState(); renderProg(); }
+function delWorkGroup(work){ if(!confirm('刪除整個「'+(work||'未命名')+'」工項的所有樓層進度？'))return; state.progress[state.activeSiteId]=progStore().filter(p=>(p.work||'')!==(work||'')); saveState(); renderProg(); }
+function delFloorGroup(floor){ const target=floor==='(未填樓層)'?'':floor; if(!confirm('刪除「'+floor+'」的所有工項進度？'))return; state.progress[state.activeSiteId]=progStore().filter(p=>(p.floor||'')!==target); saveState(); renderProg(); }
 function openProgCard(id){
   const p=progById(id); if(!p)return;
   const v=Math.max(0,Math.min(100,+p.percent||0));
