@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>工地管理員</title>
+<meta name="theme-color" content="#007AFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="工地管理員">
+<style>
+:root{
+  --blue:#007AFF; --green:#34C759; --orange:#FF9500; --red:#FF3B30; --purple:#AF52DE;
+  --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --text2:#8e8e93; --border:#e2e2e7;
+  --inp:#f7f7fa; --shadow:0 1px 3px rgba(0,0,0,.08);
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+  background:var(--bg); color:var(--text); font-size:15px; line-height:1.4;
+  -webkit-font-smoothing:antialiased; overscroll-behavior:none;
+}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+input,select,textarea{font-family:inherit; font-size:16px} /* 16px 防 iOS 放大 */
+
+/* ===== 頂部列 ===== */
+.topbar{
+  position:sticky; top:0; z-index:50; background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--border); padding:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));
+  display:flex; align-items:center; gap:8px;
+}
+.topbar .logo{font-weight:800; font-size:17px; white-space:nowrap}
+.topbar .logo small{color:var(--blue)}
+.site-sel{flex:1; display:flex; align-items:center; gap:6px; min-width:0}
+.site-sel select{
+  flex:1; min-width:0; background:var(--inp); border:1px solid var(--border); border-radius:10px;
+  padding:8px 10px; color:var(--text); font-weight:600; font-size:15px;
+}
+.icon-btn{
+  width:36px; height:36px; border-radius:10px; background:var(--inp); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--blue); flex:none;
+}
+
+/* ===== 內容區 ===== */
+.screen{display:none; padding:14px; padding-bottom:calc(78px + var(--safe-b))}
+.screen.active{display:block}
+.card{background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:14px; margin-bottom:12px}
+.card h3{margin:0 0 10px; font-size:16px}
+.muted{color:var(--text2); font-size:13px}
+.row{display:flex; gap:8px}
+.row>*{flex:1}
+label.fld{display:block; margin-bottom:10px}
+label.fld>span{display:block; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:4px}
+.inp{
+  width:100%; background:var(--inp); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; color:var(--text);
+}
+textarea.inp{resize:vertical; min-height:60px}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  background:var(--blue); color:#fff; border-radius:11px; padding:11px 14px; font-weight:700; font-size:15px;
+}
+.btn:active{opacity:.8}
+.btn.ghost{background:var(--inp); color:var(--blue); border:1px solid var(--border)}
+.btn.green{background:var(--green)}
+.btn.gray{background:var(--inp); color:var(--text2); border:1px solid var(--border)}
+.btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
+.btn.full{width:100%}
+.pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
+
+/* ===== 底部 tab ===== */
+.tabbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex;
+  background:rgba(255,255,255,.94); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border); padding-bottom:var(--safe-b);
+}
+.tabbar button{
+  flex:1; padding:8px 0 7px; display:flex; flex-direction:column; align-items:center; gap:2px;
+  color:var(--text2); font-size:11px; font-weight:600;
+}
+.tabbar button .ic{font-size:21px; line-height:1}
+.tabbar button.on{color:var(--blue)}
+
+/* ===== 月曆 ===== */
+.cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+.cal-head .mtitle{font-weight:800; font-size:16px}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px}
+.cal-grid .wd{text-align:center; font-size:11px; color:var(--text2); padding:4px 0; font-weight:600}
+.cal-cell{
+  aspect-ratio:1/1; border-radius:9px; display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-start; padding-top:6px; font-size:14px; position:relative; background:transparent;
+}
+.cal-cell.muted-day{color:var(--border)}
+.cal-cell.today{font-weight:800}
+.cal-cell.today .dnum{background:var(--red); color:#fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center}
+.cal-cell.sel{background:rgba(0,122,255,.12)}
+.cal-cell .dnum{width:26px; height:26px; display:flex; align-items:center; justify-content:center}
+.cal-cell .dots{display:flex; gap:3px; margin-top:3px; height:6px}
+.cal-cell .dots i{width:6px; height:6px; border-radius:50%}
+
+/* ===== 日誌卡 ===== */
+.log-card{border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; position:relative}
+.log-card .lc-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px}
+.log-card .lc-meta{font-size:13px; color:var(--text2); margin:2px 0 8px}
+.chips{display:flex; flex-wrap:wrap; gap:5px}
+.chip{font-size:12px; padding:4px 9px; border-radius:999px; background:var(--inp); font-weight:600; border:1px solid var(--border)}
+.chip.c-blue{background:rgba(0,122,255,.12); color:var(--blue); border-color:transparent}
+.chip.c-orange{background:rgba(255,149,0,.14); color:#c2710a; border-color:transparent}
+.chip.c-red{background:rgba(255,59,48,.12); color:var(--red); border-color:transparent}
+
+/* 多選工項 */
+.item-pick{display:flex; flex-wrap:wrap; gap:6px}
+.item-pick .opt{
+  font-size:12.5px; padding:7px 11px; border-radius:999px; background:var(--inp);
+  border:1.5px solid var(--border); font-weight:600;
+}
+.item-pick .opt.on{background:var(--blue); color:#fff; border-color:var(--blue)}
+
+/* ===== 材料雙欄 ===== */
+.mat-wrap{display:flex; gap:0; min-height:60vh; background:var(--card); border-radius:14px; overflow:hidden; box-shadow:var(--shadow)}
+.mat-nav{width:104px; flex:none; background:var(--inp); border-right:1px solid var(--border); overflow-y:auto}
+.mat-nav button{
+  display:block; width:100%; text-align:left; padding:14px 11px; font-size:13px; font-weight:600;
+  color:var(--text2); border-left:3px solid transparent;
+}
+.mat-nav button.on{background:var(--card); color:var(--blue); border-left-color:var(--blue)}
+.mat-list{flex:1; overflow-y:auto; padding:6px 10px 14px}
+.mat-item{display:flex; align-items:flex-start; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
+.mat-item .nm{font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+.mat-item .nm small{color:var(--text2); font-weight:500; font-size:12px}
+.mat-item .chk{
+  width:24px; height:24px; border-radius:7px; border:2px solid var(--border); flex:none; margin-top:2px;
+  display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;
+}
+.mat-item .chk.on{background:var(--green); border-color:var(--green)}
+.mat-item .qty-row{display:flex; gap:8px; margin-top:7px}
+.mat-item .qty-row label{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text2); font-weight:600}
+.mat-item input.qty{width:62px; text-align:center; padding:7px 4px}
+.diff{font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px}
+.diff.ok{background:rgba(52,199,89,.15); color:#1a8c3a}
+.diff.short{background:rgba(255,59,48,.13); color:var(--red)}
+.diff.over{background:rgba(255,149,0,.15); color:#a85d00}
+
+/* ===== 算料 ===== */
+.seg{display:flex; background:var(--inp); border-radius:10px; padding:3px; margin-bottom:12px}
+.seg button{flex:1; padding:9px; border-radius:8px; font-weight:700; font-size:14px; color:var(--text2)}
+.seg button.on{background:var(--card); color:var(--text); box-shadow:var(--shadow)}
+.result-row{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid var(--border)}
+.result-row .rv{font-weight:800; font-size:16px}
+.result-row .rv small{font-weight:600; color:var(--text2); font-size:12px; margin-left:3px}
+.warn{
+  background:rgba(255,149,0,.12); border:1px solid rgba(255,149,0,.4); color:#a85d00;
+  border-radius:12px; padding:12px; font-size:13.5px; line-height:1.5; margin-top:12px; font-weight:600;
+}
+
+/* ===== modal ===== */
+.modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; display:none; align-items:flex-end}
+.modal-bg.show{display:flex}
+.modal{
+  background:var(--card); width:100%; border-radius:18px 18px 0 0; padding:18px 16px;
+  padding-bottom:calc(18px + var(--safe-b)); max-height:90vh; overflow-y:auto;
+  animation:slideup .25s ease;
+}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h3{margin:0 0 14px; display:flex; justify-content:space-between; align-items:center}
+.modal h3 .x{font-size:24px; color:var(--text2); padding:0 6px}
+
+.empty{text-align:center; color:var(--text2); padding:36px 12px; font-size:14px}
+.toast{
+  position:fixed; left:50%; bottom:calc(86px + var(--safe-b)); transform:translateX(-50%);
+  background:rgba(0,0,0,.85); color:#fff; padding:11px 18px; border-radius:999px; font-size:14px;
+  font-weight:600; z-index:200; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; text-align:center;
+}
+.toast.show{opacity:1}
+.coeff-grid{display:grid; grid-template-columns:1fr 78px 44px; gap:8px 10px; align-items:center}
+.coeff-grid .h{font-size:11px; color:var(--text2); font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">工地<small>管理員</small></div>
+  <div class="site-sel">
+    <select id="siteSelect" onchange="onSiteChange()"></select>
+    <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
+    <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
+  </div>
+</div>
+
+<!-- ============ 日誌 ============ -->
+<div class="screen active" id="screen-log">
+  <div class="card">
+    <div class="cal-head">
+      <button class="icon-btn" onclick="moveMonth(-1)">‹</button>
+      <div class="mtitle" id="calTitle"></div>
+      <button class="icon-btn" onclick="moveMonth(1)">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:11px;color:var(--text2)">
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);vertical-align:middle"></i> 隔間</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--orange);vertical-align:middle"></i> 天花</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);vertical-align:middle"></i> 批土/其他</span>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
+    <div style="font-weight:800;font-size:17px" id="dayTitle">當日日誌</div>
+    <button class="btn sm" onclick="openLogForm()">＋ 新增日誌</button>
+  </div>
+  <div id="dayLogs"></div>
+</div>
+
+<!-- ============ 材料 ============ -->
+<div class="screen" id="screen-mat">
+  <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="margin-bottom:12px">
+  <div class="mat-wrap">
+    <div class="mat-nav" id="matNav"></div>
+    <div class="mat-list" id="matList"></div>
+  </div>
+</div>
+
+<!-- 底部 tab（算料計算機已暫時移除） -->
+<div class="tabbar">
+  <button id="tab-log" class="on" onclick="switchTab('log')"><span class="ic">📅</span>日誌</button>
+  <button id="tab-mat" onclick="switchTab('mat')"><span class="ic">📦</span>材料</button>
+</div>
+
+<!-- modal 容器 -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =================== 常數 =================== */
+const PING = 3.305785;             // 1 坪 = 3.305785 m²
+const BOARD_AREA = 1.674;          // 3'×6' 板材 ≈ 1.674 m²（參考既有 KEY_WIDTHS）
+
+// 13 項施工項目 → 顏色分類（隔間=藍 / 天花=橘 / 批土其他=紅）
+const LOG_ITEMS = [
+  '吊料','放樣','輕隔間立骨','隔間牆單面封板','隔間牆雙面封板','隔間牆填棉','隔間牆灌漿',
+  '隔間牆批土','暗架天花骨架吊筋','暗架天花板封板','暗架天花批土','明架天花板骨架吊筋','明架天花板鋪設'
+];
+const ITEM_COLOR = {
+  '吊料':'red','放樣':'blue','輕隔間立骨':'blue','隔間牆單面封板':'blue','隔間牆雙面封板':'blue',
+  '隔間牆填棉':'blue','隔間牆灌漿':'red','隔間牆批土':'red','暗架天花骨架吊筋':'orange',
+  '暗架天花板封板':'orange','暗架天花批土':'red','明架天花板骨架吊筋':'orange','明架天花板鋪設':'orange'
+};
+const COLOR_HEX = {blue:'#007AFF', orange:'#FF9500', red:'#FF3B30'};
+
+// 材料點收：分類與品項
+const MAT_CATS = [
+  {key:'frame', name:'隔間/天花骨架', items:['上下槽','立柱','加強橫支','大百葉','蜈蚣腳','收邊','大T','小T','吊筋']},
+  {key:'board', name:'板材類', items:['石膏板','矽酸鈣板','纖維水泥板','明架天花板','鋁企口','PVC']},
+  {key:'extra', name:'副資材與耗材', items:['岩棉','玻璃棉','護角','加強鐵片','水泥','保麗龍','檢修口']},
+];
+const MAT_UNIT = {
+  '上下槽':'支','立柱':'支','加強橫支':'支','大百葉':'支','蜈蚣腳':'支','收邊':'支','大T':'支','小T':'支','吊筋':'支',
+  '石膏板':'片','矽酸鈣板':'片','纖維水泥板':'片','明架天花板':'箱','鋁企口':'片','PVC':'片',
+  '岩棉':'包','玻璃棉':'包','護角':'支','加強鐵片':'片','水泥':'包','保麗龍':'包','檢修口':'個'
+};
+
+// 算料工法 → 預設係數（每坪數量，可編輯；預設僅供參考，請依實際叫貨微調）
+const DEFAULT_COEFFS = {
+  part_single:{label:'輕隔間牆(單面封板)', mats:[
+    {name:'立柱',unit:'支',c:1.2},{name:'上下槽',unit:'支',c:0.9},
+    {name:'矽酸鈣板',unit:'片',c:2.1},{name:'岩棉',unit:'包',c:0.35},
+    {name:'水泥',unit:'包',c:0},{name:'保麗龍',unit:'包',c:0},
+  ]},
+  part_double:{label:'輕隔間牆(雙面封板)', mats:[
+    {name:'立柱',unit:'支',c:1.2},{name:'上下槽',unit:'支',c:0.9},
+    {name:'矽酸鈣板',unit:'片',c:4.0},{name:'岩棉',unit:'包',c:0.4},
+    {name:'水泥',unit:'包',c:0},{name:'保麗龍',unit:'包',c:0},
+  ]},
+  ceil_dark:{label:'暗架天花板', mats:[
+    {name:'吊筋',unit:'支',c:1.0},{name:'大百葉',unit:'支',c:0.9},{name:'蜈蚣腳',unit:'支',c:1.6},
+    {name:'收邊',unit:'支',c:0.6},{name:'矽酸鈣板',unit:'片',c:2.1},
+  ]},
+  ceil_bright:{label:'明架天花板', warn:true, mats:[
+    {name:'大T',unit:'支',c:0.9},{name:'小T',unit:'支',c:1.6},{name:'收邊',unit:'支',c:0.6},
+    {name:'吊筋',unit:'支',c:1.0},{name:'明架天花板',unit:'箱',c:0.6},
+  ]},
+};
+const BRIGHT_WARN = '⚠️ 提示：明架落料單純置入骨架內即可，單價與工法計算中，切勿重複計入「批土/補土膏」與接縫紙帶成本。';
+
+/* =================== 狀態 =================== */
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function todayStr(){ const d=new Date(); return fmtDate(d); }
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+let state = loadState();
+let view = { tab:'log', calcMode:'area', matCat:'frame',
+  calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
+
+function defaultState(){
+  const sid = uid();
+  return { sites:[{id:sid, name:'案場一'}], activeSiteId:sid, logs:[], materials:{}, calcCoeffs:null };
+}
+function loadState(){
+  try{ const s=JSON.parse(localStorage.getItem('wm_state')); if(s&&s.sites&&s.sites.length) return s; }catch(e){}
+  return defaultState();
+}
+function saveState(){ localStorage.setItem('wm_state', JSON.stringify(state)); }
+function activeSite(){ return state.sites.find(s=>s.id===state.activeSiteId) || state.sites[0]; }
+function getCoeffs(){ return state.calcCoeffs || DEFAULT_COEFFS; }
+
+/* =================== IndexedDB 照片 store（foundation，供之後模組使用） =================== */
+let _db=null;
+function photoDB(){
+  return new Promise((res,rej)=>{
+    if(_db) return res(_db);
+    const r=indexedDB.open('wm_photos',1);
+    r.onupgradeneeded=e=>{ e.target.result.createObjectStore('photos',{keyPath:'id'}); };
+    r.onsuccess=e=>{ _db=e.target.result; res(_db); };
+    r.onerror=e=>rej(e);
+  });
+}
+async function photoPut(id, blob, meta){ const db=await photoDB(); return new Promise((res,rej)=>{ const tx=db.transaction('photos','readwrite'); tx.objectStore('photos').put({id,blob,meta}); tx.oncomplete=()=>res(id); tx.onerror=rej; }); }
+async function photoGet(id){ const db=await photoDB(); return new Promise((res,rej)=>{ const r=db.transaction('photos').objectStore('photos').get(id); r.onsuccess=()=>res(r.result); r.onerror=rej; }); }
+async function photoDel(id){ const db=await photoDB(); return new Promise((res,rej)=>{ const tx=db.transaction('photos','readwrite'); tx.objectStore('photos').delete(id); tx.oncomplete=()=>res(); tx.onerror=rej; }); }
+
+/* =================== UI helper =================== */
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function openModal(html){ document.getElementById('modalBox').innerHTML=html; document.getElementById('modalBg').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+
+/* =================== 案場 =================== */
+function renderSiteSelect(){
+  const sel=document.getElementById('siteSelect');
+  sel.innerHTML=state.sites.map(s=>`<option value="${s.id}"${s.id===state.activeSiteId?' selected':''}>${esc(s.name)}</option>`).join('');
+}
+function onSiteChange(){ state.activeSiteId=document.getElementById('siteSelect').value; saveState(); renderAll(); }
+function addSite(){
+  openModal(`<h3>新增案場 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>案場名稱</span><input class="inp" id="newSiteName" placeholder="例：青年安心住宅"></label>
+    <button class="btn full" onclick="doAddSite()">建立</button>`);
+  setTimeout(()=>document.getElementById('newSiteName').focus(),100);
+}
+function doAddSite(){
+  const n=document.getElementById('newSiteName').value.trim(); if(!n) return toast('請輸入名稱');
+  const id=uid(); state.sites.push({id,name:n}); state.activeSiteId=id; saveState(); closeModal(); renderAll();
+}
+function renameSite(){
+  const s=activeSite();
+  openModal(`<h3>重命名案場 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>案場名稱</span><input class="inp" id="rnSiteName" value="${esc(s.name)}"></label>
+    <div class="row"><button class="btn gray" onclick="delSite()">刪除案場</button><button class="btn" onclick="doRenameSite()">儲存</button></div>`);
+}
+function doRenameSite(){
+  const n=document.getElementById('rnSiteName').value.trim(); if(!n) return toast('請輸入名稱');
+  activeSite().name=n; saveState(); closeModal(); renderAll();
+}
+function delSite(){
+  if(state.sites.length<=1) return toast('至少需保留一個案場');
+  if(!confirm('確定刪除此案場？該案場日誌與材料資料會一併移除。')) return;
+  const id=state.activeSiteId;
+  state.sites=state.sites.filter(s=>s.id!==id);
+  state.logs=state.logs.filter(l=>l.siteId!==id);
+  delete state.materials[id];
+  state.activeSiteId=state.sites[0].id; saveState(); closeModal(); renderAll();
+}
+
+/* =================== Tab =================== */
+function switchTab(t){
+  view.tab=t;
+  ['log','mat'].forEach(x=>{
+    document.getElementById('screen-'+x).classList.toggle('active', x===t);
+    document.getElementById('tab-'+x).classList.toggle('on', x===t);
+  });
+  if(t==='mat') renderMat();
+}
+
+/* =================== 月曆 =================== */
+function moveMonth(d){
+  view.calMonth+=d;
+  if(view.calMonth<0){view.calMonth=11; view.calYear--;}
+  if(view.calMonth>11){view.calMonth=0; view.calYear++;}
+  renderCalendar();
+}
+function logsOn(dateStr){ return state.logs.filter(l=>l.siteId===state.activeSiteId && l.date===dateStr); }
+function dayColors(dateStr){
+  const set=new Set();
+  logsOn(dateStr).forEach(l=>(l.items||[]).forEach(it=>{ if(ITEM_COLOR[it]) set.add(ITEM_COLOR[it]); }));
+  return ['blue','orange','red'].filter(c=>set.has(c));
+}
+function renderCalendar(){
+  const y=view.calYear, m=view.calMonth;
+  document.getElementById('calTitle').textContent=`${y} 年 ${m+1} 月`;
+  const first=new Date(y,m,1).getDay();
+  const days=new Date(y,m+1,0).getDate();
+  const wd=['日','一','二','三','四','五','六'];
+  let html=wd.map(w=>`<div class="wd">${w}</div>`).join('');
+  for(let i=0;i<first;i++) html+=`<div class="cal-cell muted-day"></div>`;
+  const tStr=todayStr();
+  for(let d=1;d<=days;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const colors=dayColors(ds);
+    const dots=colors.map(c=>`<i style="background:${COLOR_HEX[c]}"></i>`).join('');
+    const cls=['cal-cell']; if(ds===tStr)cls.push('today'); if(ds===view.selDate)cls.push('sel');
+    html+=`<div class="${cls.join(' ')}" onclick="selectDate('${ds}')"><div class="dnum">${d}</div><div class="dots">${dots}</div></div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDayLogs(); }
+
+function renderDayLogs(){
+  document.getElementById('dayTitle').textContent=`${view.selDate} 日誌`;
+  const logs=logsOn(view.selDate);
+  const box=document.getElementById('dayLogs');
+  if(!logs.length){ box.innerHTML=`<div class="empty">這天還沒有日誌<br>點右上「＋ 新增日誌」開始記錄</div>`; return; }
+  box.innerHTML=logs.map(l=>{
+    const chips=(l.items||[]).map(it=>`<span class="chip c-${ITEM_COLOR[it]||'blue'}">${esc(it)}</span>`).join('');
+    return `<div class="log-card">
+      <div class="lc-top">
+        <div style="font-weight:700">${esc(l.floor||'未填樓層')} · ${esc(l.vendor||'未填廠商')}</div>
+        <button class="btn green sm" onclick="shareLine('${l.id}')">LINE</button>
+      </div>
+      <div class="lc-meta">進場人數：${esc(l.headcount||'-')} 人${l.note?' ｜ '+esc(l.note):''}</div>
+      <div class="chips">${chips||'<span class="muted">未選工項</span>'}</div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn ghost sm" onclick="openLogForm('${l.id}')">編輯</button>
+        <button class="btn gray sm" onclick="delLog('${l.id}')">刪除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* 日誌表單 */
+function openLogForm(id){
+  const editing = id ? state.logs.find(l=>l.id===id) : null;
+  const cur = editing || {date:view.selDate, vendor:'', floor:'', headcount:'', items:[], note:''};
+  const opts = LOG_ITEMS.map(it=>`<button type="button" class="opt${(cur.items||[]).includes(it)?' on':''}" data-it="${esc(it)}" onclick="this.classList.toggle('on')">${esc(it)}</button>`).join('');
+  openModal(`<h3>${editing?'編輯':'新增'}施工日誌 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>案場名稱</span><input class="inp" value="${esc(activeSite().name)}" disabled></label>
+    <label class="fld"><span>日期</span><input class="inp" type="date" id="lfDate" value="${esc(cur.date)}"></label>
+    <label class="fld"><span>施工廠商</span><input class="inp" id="lfVendor" value="${esc(cur.vendor)}" placeholder="例：明昌輕鋼架"></label>
+    <div class="row">
+      <label class="fld"><span>施工樓層</span><input class="inp" id="lfFloor" value="${esc(cur.floor)}" placeholder="例：3F-A區"></label>
+      <label class="fld"><span>進場人數</span><input class="inp" id="lfHead" type="number" inputmode="numeric" value="${esc(cur.headcount)}"></label>
+    </div>
+    <label class="fld"><span>施工項目（可多選）</span></label>
+    <div class="item-pick" id="lfItems">${opts}</div>
+    <label class="fld" style="margin-top:12px"><span>備註</span><textarea class="inp" id="lfNote" placeholder="補充說明…">${esc(cur.note)}</textarea></label>
+    <button class="btn full" onclick="saveLog(${editing?`'${id}'`:'null'})">儲存日誌</button>`);
+}
+function saveLog(id){
+  const items=[...document.querySelectorAll('#lfItems .opt.on')].map(b=>b.dataset.it);
+  const data={
+    date:document.getElementById('lfDate').value||todayStr(),
+    vendor:document.getElementById('lfVendor').value.trim(),
+    floor:document.getElementById('lfFloor').value.trim(),
+    headcount:document.getElementById('lfHead').value.trim(),
+    items, note:document.getElementById('lfNote').value.trim(),
+  };
+  if(id){ Object.assign(state.logs.find(l=>l.id===id), data); }
+  else { state.logs.push({id:uid(), siteId:state.activeSiteId, ...data}); }
+  view.selDate=data.date;
+  saveState(); closeModal(); renderCalendar(); renderDayLogs();
+  toast('日誌已儲存');
+}
+function delLog(id){ if(!confirm('刪除此筆日誌？'))return; state.logs=state.logs.filter(l=>l.id!==id); saveState(); renderCalendar(); renderDayLogs(); }
+
+/* LINE 分享 */
+function lineText(l){
+  return `【案場】${activeSite().name}\n【日期】${l.date}\n【廠商】${l.vendor||'-'}\n【樓層】${l.floor||'-'}\n【人數】${l.headcount||'-'} 人\n【施工項目】${(l.items||[]).join('、')||'-'}${l.note?'\n【備註】'+l.note:''}`;
+}
+async function shareLine(id){
+  const l=state.logs.find(x=>x.id===id); if(!l)return;
+  const txt=lineText(l);
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  if(navigator.share){
+    try{ await navigator.share({text:txt}); return; }catch(e){ if(e.name==='AbortError')return; }
+  }
+  toast('已複製，貼到 LINE 群組即可');
+}
+
+/* =================== 材料點收 =================== */
+function matStore(){
+  const sid=state.activeSiteId;
+  if(!state.materials[sid]) state.materials[sid]={ordered:{},actual:{},checked:{}};
+  return state.materials[sid];
+}
+function renderMat(){
+  const nav=document.getElementById('matNav');
+  nav.innerHTML=MAT_CATS.map(c=>`<button class="${c.key===view.matCat?'on':''}" onclick="view.matCat='${c.key}';renderMat()">${esc(c.name)}</button>`).join('');
+  const q=document.getElementById('matSearch').value.trim();
+  const store=matStore();
+  // 把已存在但不在預設清單的品項（例如匯入的自訂材料）併入「副資材與耗材」顯示
+  const known=new Set(); MAT_CATS.forEach(c=>c.items.forEach(i=>known.add(i)));
+  const orphans=[...new Set([...Object.keys(store.ordered),...Object.keys(store.actual),...Object.keys(store.checked||{})])].filter(k=>!known.has(k));
+  const CATS = MAT_CATS.map(c=> c.key==='extra' ? {...c, items:[...c.items, ...orphans]} : c);
+  let cats = q ? CATS : CATS.filter(c=>c.key===view.matCat);
+  if(q){ nav.style.opacity=.4; } else { nav.style.opacity=1; }
+  let html='';
+  cats.forEach(c=>{
+    const items=c.items.filter(it=> !q || it.includes(q));
+    if(!items.length) return;
+    if(q) html+=`<div class="muted" style="font-weight:700;margin:8px 2px 2px">${esc(c.name)}</div>`;
+    items.forEach(it=>{
+      const ordered=store.ordered[it]!=null?store.ordered[it]:'';
+      const actual=store.actual[it]!=null?store.actual[it]:'';
+      const on=store.checked[it];
+      const unit=MAT_UNIT[it]||'';
+      const diff = (ordered!==''&&actual!=='') ? (actual-ordered) : null;
+      const diffTag = diff!=null ? `<span class="diff ${diff===0?'ok':(diff<0?'short':'over')}">${diff===0?'✓ 符合':(diff<0?'缺'+Math.abs(Math.round(diff*100)/100):'多'+Math.round(diff*100)/100)}</span>` : '';
+      html+=`<div class="mat-item">
+        <div class="chk${on?' on':''}" onclick="toggleMat('${esc(it)}')">${on?'✓':''}</div>
+        <div style="flex:1;min-width:0">
+          <div class="nm">${esc(it)} <small>${esc(unit)}</small> ${diffTag}</div>
+          <div class="qty-row">
+            <label>已訂<input class="inp qty" type="number" inputmode="decimal" placeholder="—" value="${ordered}" onchange="setMatOrdered('${esc(it)}',this.value)"></label>
+            <label>實際<input class="inp qty" type="number" inputmode="decimal" placeholder="—" value="${actual}" onchange="setMatActual('${esc(it)}',this.value)"></label>
+          </div>
+        </div>
+      </div>`;
+    });
+  });
+  document.getElementById('matList').innerHTML=html||`<div class="empty">查無品項</div>`;
+}
+function toggleMat(it){ const s=matStore(); s.checked[it]=!s.checked[it]; saveState(); renderMat(); }
+function setMatOrdered(it,v){ const s=matStore(); if(v==='')delete s.ordered[it]; else s.ordered[it]=parseFloat(v)||0; saveState(); renderMat(); }
+function setMatActual(it,v){ const s=matStore(); if(v==='')delete s.actual[it]; else s.actual[it]=parseFloat(v)||0; if(s.actual[it]!=null) s.checked[it]=true; saveState(); renderMat(); }
+
+/* =================== PWA manifest（inline，免額外檔） =================== */
+function setupPWA(){
+  const icon='data:image/svg+xml,'+encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" rx="42" fill="#007AFF"/><text x="96" y="120" font-size="90" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="bold">工</text></svg>`);
+  const manifest={ name:'工地管理員', short_name:'工地管理員', start_url:'.', display:'standalone',
+    background_color:'#f2f2f7', theme_color:'#007AFF',
+    icons:[{src:icon, sizes:'192x192', type:'image/svg+xml', purpose:'any'}] };
+  const url=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'}));
+  const link=document.createElement('link'); link.rel='manifest'; link.href=url; document.head.appendChild(link);
+  const al=document.createElement('link'); al.rel='apple-touch-icon'; al.href=icon; document.head.appendChild(al);
+}
+
+/* =================== init =================== */
+function renderAll(){ renderSiteSelect(); renderCalendar(); renderDayLogs(); renderMat(); }
+function init(){ setupPWA(); renderAll(); }
+init();
+</script>
+</body>
+</html>
