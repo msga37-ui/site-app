@@ -130,11 +130,19 @@ textarea.inp{resize:vertical; min-height:60px}
 .mat-cat-row .catname{flex:1; font-size:13px; font-weight:600; color:var(--text2); word-break:break-all; line-height:1.3}
 .mat-cat-row.on .catname{color:var(--blue)}
 .mat-cat-row .del{font-size:13px; padding:0 1px; color:var(--red)}
+.mat-cat-row .cat-ctl{display:flex; gap:1px; flex:none}
+.mat-cat-btn{display:block; width:100%; text-align:left; padding:13px 11px; font-size:13px; font-weight:600; color:var(--text2); border-left:3px solid transparent; border-bottom:1px solid var(--border)}
+.mat-cat-btn.on{background:var(--card); color:var(--blue); border-left-color:var(--blue)}
 .mat-addcat{display:block; width:100%; text-align:center; padding:12px 6px; font-size:13px; font-weight:700; color:var(--blue); border-top:1px dashed var(--border)}
-.drag-handle{cursor:grab; color:var(--text2); font-size:15px; line-height:1; touch-action:none; user-select:none; padding:0 2px; flex:none}
-.mat-cat-row.dragging,.mat-group.dragging{opacity:.45}
-.mg-head .drag-handle{margin-right:2px}
-.mat-list{flex:1; overflow-y:auto; padding:6px 10px 14px}
+.mat-list{flex:1; overflow-y:auto; padding:4px 12px 14px}
+.mat-cat-head{font-weight:800; font-size:14px; color:var(--text2); margin:12px 2px 2px}
+.mat-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 4px; border-bottom:1px solid var(--border); cursor:pointer}
+.mat-row .mr-name{font-weight:600; font-size:14.5px; flex:1; min-width:0}
+.mat-row .mr-ord{font-size:13px; color:var(--text2); font-weight:600; white-space:nowrap}
+.mr-empty{color:var(--border); font-weight:500}
+.mat-row.edit{cursor:default}
+.mat-row .cat-ctl{display:flex; gap:2px; flex:none}
+.cat-ctl .del{font-size:14px; padding:3px 5px}
 .mat-item{display:flex; align-items:flex-start; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
 .mat-item .nm{font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
 .mat-item .nm small{color:var(--text2); font-weight:500; font-size:12px}
@@ -328,11 +336,11 @@ textarea.inp{resize:vertical; min-height:60px}
     <button onclick="setMatMode('orders')">材料訂單</button>
   </div>
   <div id="matListView">
-    <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
       <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="flex:1">
-      <button class="btn sm" onclick="openOrderForm()">🛒 下單</button>
+      <button class="btn ghost sm" id="matEditBtn" onclick="toggleMatEdit()">✎ 編輯</button>
+      <button class="btn sm" onclick="openOrderForm()">🛒</button>
     </div>
-    <div class="muted" style="text-align:center;font-size:12px;margin-bottom:8px">長按分類或品項名稱可改名 ｜ 按住 ≡ 可拖曳排序</div>
     <div class="mat-wrap">
       <div class="mat-nav" id="matNav"></div>
       <div class="mat-list" id="matList"></div>
@@ -937,43 +945,60 @@ function matPointerInit(){
   });
 }
 
+function toggleMatEdit(){ view.matEdit=!view.matEdit; const b=document.getElementById('matEditBtn'); if(b){ b.textContent=view.matEdit?'完成':'✎ 編輯'; b.classList.toggle('green',view.matEdit); } renderMat(); }
+function itemOrderedTotal(name){ const it=matStore().items[name]; if(!it)return 0; return f2((it.specs||[]).reduce((t,s)=>t+(+s.ordered||0),0)); }
+function matCleanRow(name){
+  const def=getMatDef(name); const tot=itemOrderedTotal(name);
+  const right = tot ? ('已訂 '+tot+(def.unit||'')) : '<span class="mr-empty">點我點收</span>';
+  return `<div class="mat-row" onclick="openMatDetail('${esc(name)}')">
+    <span class="mr-name">${esc(name)}</span>
+    <span class="mr-ord">${right}</span>
+  </div>`;
+}
+function matEditRow(name){
+  return `<div class="mat-row edit">
+    <span class="mr-name">${esc(name)}</span>
+    <span class="cat-ctl"><button class="del" onclick="renameItemPrompt('${esc(name)}')">✎</button><button class="del" onclick="moveItem('${esc(name)}',-1)">▲</button><button class="del" onclick="moveItem('${esc(name)}',1)">▼</button><button class="del" onclick="delItem('${esc(name)}')">🗑</button></span>
+  </div>`;
+}
 function renderMat(){
   const cats=catalogStore();
   if(!cats.find(c=>c.id===view.matCat)) view.matCat=cats[0]?cats[0].id:null;
   const q=document.getElementById('matSearch').value.trim();
   const nav=document.getElementById('matNav');
-  nav.innerHTML=cats.map(c=>`<div class="mat-cat-row${c.id===view.matCat?' on':''}" data-row data-kind="cat" data-key="${c.id}">
-      <span class="drag-handle">≡</span>
-      <span class="lp-name catname" onclick="if(!_lpFired){view.matCat='${c.id}';renderMat();}">${esc(c.name)}</span>
-      <button class="del" onclick="delCat('${c.id}')">🗑</button>
-    </div>`).join('')
-    + `<button class="mat-addcat" onclick="addCatPrompt()">＋ 分類</button>`;
+  if(view.matEdit){
+    nav.innerHTML=cats.map(c=>`<div class="mat-cat-row${c.id===view.matCat?' on':''}">
+      <span class="catname" onclick="view.matCat='${c.id}';renderMat()">${esc(c.name)}</span>
+      <span class="cat-ctl"><button class="del" onclick="renameCatPrompt('${c.id}')">✎</button><button class="del" onclick="moveCat('${c.id}',-1)">▲</button><button class="del" onclick="moveCat('${c.id}',1)">▼</button><button class="del" onclick="delCat('${c.id}')">🗑</button></span>
+    </div>`).join('')+`<button class="mat-addcat" onclick="addCatPrompt()">＋ 分類</button>`;
+  } else {
+    nav.innerHTML=cats.map(c=>`<button class="mat-cat-btn${c.id===view.matCat?' on':''}" onclick="view.matCat='${c.id}';renderMat()">${esc(c.name)}</button>`).join('');
+  }
   nav.style.opacity = q ? .5 : 1;
-  const m=matStore();
   let html='';
   const shown = q ? cats : cats.filter(c=>c.id===view.matCat);
   shown.forEach(c=>{
-    let groupHtml='';
-    c.items.forEach(it=>{
-      if(q){ const grp=m.items[it.name]; const hit=it.name.includes(q)||(grp&&(grp.specs||[]).some(s=>(s.label||'').includes(q))); if(!hit)return; }
-      groupHtml+=renderMatGroup(it.name);
-    });
-    if(q && !groupHtml) return;
-    if(q) html+=`<div class="muted" style="font-weight:700;margin:10px 2px 2px">${esc(c.name)}</div>`;
-    html+=groupHtml;
-    if(!q) html+=`<button class="btn ghost sm" style="margin:10px 2px 4px" onclick="addItemPrompt('${c.id}')">＋ 新增品項</button>`;
+    let rowsHtml='';
+    c.items.forEach(it=>{ if(q && !it.name.includes(q)) return; rowsHtml += view.matEdit ? matEditRow(it.name) : matCleanRow(it.name); });
+    if(q && !rowsHtml) return;
+    if(q) html+=`<div class="mat-cat-head">${esc(c.name)}</div>`;
+    html+=rowsHtml;
+    if(!q) html+=`<button class="btn ghost sm" style="margin:10px 2px 6px" onclick="addItemPrompt('${c.id}')">＋ 新增品項</button>`;
   });
   document.getElementById('matList').innerHTML=html||`<div class="empty">查無品項</div>`;
 }
-function renderMatGroup(name){
+let _matDetail=null;
+function afterMatChange(){ if(_matDetail) openMatDetail(_matDetail); else renderMat(); }
+function closeMatDetail(){ _matDetail=null; closeModal(); renderMat(); }
+function openMatDetail(name){
+  _matDetail=name;
   const def=getMatDef(name);
-  const grp=matStore().items[name];
-  const specs=grp?grp.specs:[];
+  const grp=matItem(name);
+  const specs=grp.specs||[];
   const perBox = def.perBox||null;
   const isBox = perBox && perBox>0;
   const unit=def.unit||'';
-  const boxCfg = isBox
-    ? `<span class="perbox">每箱<input type="number" inputmode="numeric" value="${perBox}" onchange="setPerBox('${esc(name)}',this.value)">支</span>` : '';
+  const boxCfg = isBox?`<div class="muted" style="margin-bottom:8px">每箱 <input class="inp" style="width:62px;padding:5px;display:inline-block;text-align:center" type="number" inputmode="numeric" value="${perBox}" onchange="setPerBox('${esc(name)}',this.value)"> 支</div>`:'';
   let rows='';
   specs.forEach(s=>{
     const ordered=(s.ordered!=null&&s.ordered!=='')?s.ordered:'';
@@ -997,27 +1022,24 @@ function renderMatGroup(name){
     </div>`;
   });
   const chips=(def.presets||[]).map(p=>`<button class="preset-chip" onclick="addSpec('${esc(name)}','${esc(p)}')">＋${esc(p)}</button>`).join('')
-    + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂</button>`;
-  return `<div class="mat-group" data-row data-kind="item" data-key="${esc(name)}">
-    <div class="mg-head">
-      <span class="drag-handle">≡</span>
-      <div class="t lp-name" style="flex:1">${esc(name)} <small>${esc(unit)}</small></div>
-      <div style="display:flex;align-items:center;gap:6px">${boxCfg}<button class="del" onclick="delItem('${esc(name)}')">🗑</button></div>
-    </div>
-    ${rows}
-    <div class="presets">${chips}</div>
-  </div>`;
+    + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂規格</button>`;
+  openModal(`<h3>${esc(name)} <small style="color:var(--text2);font-size:13px">${esc(unit)}</small> <span class="x" onclick="closeMatDetail()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">分規格填「已訂／實際」做點收對帳。</div>
+    ${boxCfg}
+    ${rows||'<div class="muted" style="margin:6px 0">尚無規格，點下方新增。</div>'}
+    <div class="presets" style="margin-top:10px">${chips}</div>
+    <button class="btn full" style="margin-top:14px" onclick="closeMatDetail()">完成</button>`);
 }
-function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); renderMat(); }
-function delSpec(name,sid){ const it=matStore().items[name]; if(!it)return; it.specs=it.specs.filter(s=>s.id!==sid); saveState(); renderMat(); }
+function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); afterMatChange(); }
+function delSpec(name,sid){ const it=matStore().items[name]; if(!it)return; it.specs=it.specs.filter(s=>s.id!==sid); saveState(); afterMatChange(); }
 function setSpec(name,sid,field,v){
   const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(!s)return;
   if(field==='label'){ s.label=v; }
   else { s[field]=(v===''?'':(parseFloat(v)||0)); if(field==='actual'&&v!=='') s.checked=true; }
-  saveState(); renderMat();
+  saveState(); afterMatChange();
 }
-function setPerBox(name,v){ const def=getMatDef(name); if(def) def.perBox=parseFloat(v)||0; saveState(); renderMat(); }
-function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
+function setPerBox(name,v){ const def=getMatDef(name); if(def) def.perBox=parseFloat(v)||0; saveState(); afterMatChange(); }
+function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); afterMatChange(); } }
 
 /* ===== 購物車下單 / 材料訂單 ===== */
 function ordStore(){ if(!state.orders)state.orders={}; const sid=state.activeSiteId; if(!state.orders[sid])state.orders[sid]=[]; return state.orders[sid]; }
