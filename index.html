@@ -171,6 +171,8 @@ textarea.inp{resize:vertical; min-height:60px}
 .photo-strip .thumb img{width:100%; height:100%; object-fit:cover; display:block}
 .photo-strip .thumb-x{position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center}
 .custom-tag{font-size:10px; background:rgba(0,122,255,.12); color:var(--blue); padding:1px 6px; border-radius:999px; font-weight:700; vertical-align:middle}
+.cat-bar{display:flex; align-items:center; gap:4px; background:var(--inp); border-radius:8px; padding:7px 10px; margin:10px 2px 4px; font-size:13px}
+.mat-nav .mat-addcat{color:var(--blue); font-weight:700; border-top:1px dashed var(--border); text-align:center}
 
 /* ===== 工項進度 ===== */
 .prog-group{padding:14px 14px 12px}
@@ -297,9 +299,12 @@ textarea.inp{resize:vertical; min-height:60px}
     <button onclick="setMatMode('orders')">材料訂單</button>
   </div>
   <div id="matListView">
-    <div style="display:flex;gap:8px;margin-bottom:12px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="flex:1">
       <button class="btn sm" onclick="openOrderForm()">🛒 下單</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn ghost sm" id="matEditBtn" onclick="toggleMatEdit()">編輯目錄</button>
     </div>
     <div class="mat-wrap">
       <div class="mat-nav" id="matNav"></div>
@@ -410,7 +415,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:'frame', matMode:'list', progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
+let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progExpanded:{}, progView:'floor', floorExpanded:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -810,68 +815,76 @@ function matStore(){
   if(!m.customItems) m.customItems=[];
   return m;
 }
-function getMatDef(name){ return MAT_DEF[name] || matStore().customItems.find(c=>c.name===name) || {unit:'',presets:[]}; }
-function matItem(name){
-  const m=matStore();
-  if(!m.items[name]){ const def=getMatDef(name); m.items[name]={perBox:(def.perBox||null), specs:[]}; }
-  return m.items[name];
+/* 可自由編輯的材料目錄（分案場）：catalog[sid]=[{id,name,items:[{id,name,unit,perBox,presets}]}] */
+function catalogStore(){
+  if(!state.catalog) state.catalog={};
+  const sid=state.activeSiteId;
+  if(!state.catalog[sid]){
+    const cats=MAT_CATS.map(c=>({ id:uid(), name:c.name, items:c.items.map(it=>({id:uid(), name:it.name, unit:it.unit||'', perBox:it.perBox||null, presets:(it.presets||[]).slice()})) }));
+    const m=state.materials[sid];
+    if(m){
+      const known=new Set(); cats.forEach(c=>c.items.forEach(i=>known.add(i.name)));
+      const catName={frame:'隔間/天花骨架',board:'板材類',extra:'副資材與耗材'};
+      (m.customItems||[]).forEach(ci=>{ if(known.has(ci.name))return; let cat=cats.find(c=>c.name===catName[ci.cat])||cats[cats.length-1]; cat.items.push({id:uid(),name:ci.name,unit:ci.unit||'',perBox:ci.perBox||null,presets:(ci.presets||[]).slice()}); known.add(ci.name); });
+      Object.keys(m.items||{}).forEach(nm=>{ if(known.has(nm))return; cats[cats.length-1].items.push({id:uid(),name:nm,unit:'',perBox:(m.items[nm].perBox||null),presets:[]}); known.add(nm); });
+    }
+    state.catalog[sid]=cats;
+  }
+  return state.catalog[sid];
 }
+function getMatDef(name){ for(const c of catalogStore()){ const it=c.items.find(x=>x.name===name); if(it) return it; } return {unit:'',presets:[]}; }
+function findCatItem(name){ for(const c of catalogStore()){ const it=c.items.find(x=>x.name===name); if(it) return {cat:c, item:it}; } return null; }
+function nameExists(name){ return catalogStore().some(c=>c.items.some(i=>i.name===name)); }
+function matItem(name){ const m=matStore(); if(!m.items[name]){ m.items[name]={specs:[]}; } return m.items[name]; }
 function f2(n){ return Math.round((+n||0)*100)/100; }
-function openAddCustomMat(cat){
-  openModal(`<h3>新增自訂材料 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="muted" style="margin-bottom:12px">新增的材料只會出現在<b>目前案場</b>。</div>
-    <label class="fld"><span>材料名稱</span><input class="inp" id="cmName" placeholder="例：白膠"></label>
-    <label class="fld"><span>計量單位</span>
-      <select class="inp" id="cmUnit"><option>支</option><option>片</option><option>包</option><option>箱</option><option>個</option><option>桶</option><option>捲</option><option>組</option><option>才</option></select>
-    </label>
-    <label class="fld"><span>每箱支數（箱裝才填，否則留空）</span><input class="inp" id="cmPerBox" type="number" inputmode="numeric" placeholder="留空＝非箱裝"></label>
-    <button class="btn full" onclick="addCustomItem('${cat}')">新增</button>`);
+function toggleMatEdit(){ view.matEdit=!view.matEdit; const b=document.getElementById('matEditBtn'); if(b){ b.textContent=view.matEdit?'完成':'編輯目錄'; b.classList.toggle('green',view.matEdit); } renderMat(); }
+
+/* 分類管理 */
+function addCatPrompt(){ openModal(`<h3>新增分類 <span class="x" onclick="closeModal()">×</span></h3><label class="fld"><span>分類名稱</span><input class="inp" id="catName" placeholder="例：五金另件"></label><button class="btn full" onclick="addCat()">新增</button>`); }
+function addCat(){ const n=(document.getElementById('catName').value||'').trim(); if(!n)return toast('請輸入名稱'); const cats=catalogStore(); if(cats.some(c=>c.name===n))return toast('已有同名分類'); const c={id:uid(),name:n,items:[]}; cats.push(c); view.matCat=c.id; saveState(); closeModal(); renderMat(); }
+function renameCatPrompt(id){ const c=catalogStore().find(x=>x.id===id); if(!c)return; openModal(`<h3>分類改名 <span class="x" onclick="closeModal()">×</span></h3><label class="fld"><span>分類名稱</span><input class="inp" id="catName" value="${esc(c.name)}"></label><button class="btn full" onclick="renameCat('${id}')">儲存</button>`); }
+function renameCat(id){ const n=(document.getElementById('catName').value||'').trim(); if(!n)return toast('請輸入名稱'); const c=catalogStore().find(x=>x.id===id); if(c)c.name=n; saveState(); closeModal(); renderMat(); }
+function delCat(id){ const cats=catalogStore(); const c=cats.find(x=>x.id===id); if(!c)return; if(!confirm('刪除分類「'+c.name+'」？底下所有品項與已填數量都會移除。'))return; const m=matStore(); c.items.forEach(it=>{ delete m.items[it.name]; }); state.catalog[state.activeSiteId]=cats.filter(x=>x.id!==id); if(view.matCat===id){ const left=state.catalog[state.activeSiteId]; view.matCat=left[0]?left[0].id:null; } saveState(); renderMat(); }
+function moveCat(id,dir){ const cats=catalogStore(); const i=cats.findIndex(c=>c.id===id); const j=i+dir; if(i<0||j<0||j>=cats.length)return; [cats[i],cats[j]]=[cats[j],cats[i]]; saveState(); renderMat(); }
+
+/* 品項管理 */
+function addItemPrompt(catId){
+  openModal(`<h3>新增品項 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>品項名稱</span><input class="inp" id="itName" placeholder="例：內迫壁虎 3/8&quot;"></label>
+    <label class="fld"><span>計量單位</span><select class="inp" id="itUnit"><option>支</option><option>片</option><option>包</option><option>箱</option><option>個</option><option>桶</option><option>捲</option><option>組</option><option>才</option></select></label>
+    <label class="fld"><span>每箱支數（箱裝才填，否則留空）</span><input class="inp" id="itPerBox" type="number" inputmode="numeric" placeholder="留空＝非箱裝"></label>
+    <button class="btn full" onclick="addItem('${catId}')">新增</button>`);
 }
-function addCustomItem(cat){
-  const name=(document.getElementById('cmName').value||'').trim();
-  if(!name) return toast('請輸入材料名稱');
-  const m=matStore();
-  if(MAT_DEF[name]||m.customItems.find(c=>c.name===name)) return toast('已有同名材料');
-  const unit=document.getElementById('cmUnit').value;
-  const pb=parseFloat(document.getElementById('cmPerBox').value)||null;
-  m.customItems.push({name, unit, perBox:pb, presets:[], cat, custom:true});
-  saveState(); closeModal(); renderMat(); toast('已新增自訂材料');
-}
-function delCustomItem(name){
-  if(!confirm('刪除自訂材料「'+name+'」？已填的數量也會一併移除。'))return;
-  const m=matStore();
-  m.customItems=m.customItems.filter(c=>c.name!==name);
-  delete m.items[name];
-  saveState(); renderMat();
-}
+function addItem(catId){ const name=(document.getElementById('itName').value||'').trim(); if(!name)return toast('請輸入名稱'); if(nameExists(name))return toast('已有同名品項'); const c=catalogStore().find(x=>x.id===catId); if(!c)return; const unit=document.getElementById('itUnit').value; const pb=parseFloat(document.getElementById('itPerBox').value)||null; c.items.push({id:uid(),name,unit,perBox:pb,presets:[]}); saveState(); closeModal(); renderMat(); }
+function renameItemPrompt(name){ openModal(`<h3>品項改名 <span class="x" onclick="closeModal()">×</span></h3><label class="fld"><span>品項名稱</span><input class="inp" id="itNewName" value="${esc(name)}"></label><button class="btn full" onclick="renameItem('${esc(name)}')">儲存</button>`); }
+function renameItem(oldName){ const n=(document.getElementById('itNewName').value||'').trim(); if(!n)return toast('請輸入名稱'); if(n!==oldName && nameExists(n))return toast('已有同名品項'); const f=findCatItem(oldName); if(f){ f.item.name=n; const m=matStore(); if(m.items[oldName]){ m.items[n]=m.items[oldName]; delete m.items[oldName]; } } saveState(); closeModal(); renderMat(); }
+function delItem(name){ if(!confirm('刪除品項「'+name+'」？已填數量也會移除。'))return; const f=findCatItem(name); if(f){ f.cat.items=f.cat.items.filter(i=>i.name!==name); } delete matStore().items[name]; saveState(); renderMat(); }
+function moveItem(name,dir){ const f=findCatItem(name); if(!f)return; const arr=f.cat.items; const i=arr.findIndex(x=>x.name===name); const j=i+dir; if(j<0||j>=arr.length)return; [arr[i],arr[j]]=[arr[j],arr[i]]; saveState(); renderMat(); }
 
 function renderMat(){
-  const nav=document.getElementById('matNav');
-  nav.innerHTML=MAT_CATS.map(c=>`<button class="${c.key===view.matCat?'on':''}" onclick="view.matCat='${c.key}';renderMat()">${esc(c.name)}</button>`).join('');
+  const cats=catalogStore();
+  if(!cats.find(c=>c.id===view.matCat)) view.matCat=cats[0]?cats[0].id:null;
   const q=document.getElementById('matSearch').value.trim();
-  const store=matStore();
-  const customNames=store.customItems.map(c=>c.name);
-  const catalog=new Set([...Object.keys(MAT_DEF), ...customNames]);
-  const orphans=Object.keys(store.items).filter(n=>!catalog.has(n)); // 舊資料殘留的非清單品項
-  let cats = q ? MAT_CATS : MAT_CATS.filter(c=>c.key===view.matCat);
+  const nav=document.getElementById('matNav');
+  nav.innerHTML=cats.map(c=>`<button class="${c.id===view.matCat?'on':''}" onclick="view.matCat='${c.id}';renderMat()">${esc(c.name)}</button>`).join('')
+    + (view.matEdit?`<button class="mat-addcat" onclick="addCatPrompt()">＋ 分類</button>`:'');
   nav.style.opacity = q ? .4 : 1;
+  const m=matStore();
   let html='';
-  cats.forEach(c=>{
-    let names=[...c.items.map(it=>it.name), ...store.customItems.filter(ci=>ci.cat===c.key).map(ci=>ci.name)];
-    if(c.key==='extra') names=[...names,...orphans];
+  const shown = q ? cats : cats.filter(c=>c.id===view.matCat);
+  shown.forEach(c=>{
     let groupHtml='';
-    names.forEach(name=>{
-      if(q){
-        const grp=store.items[name];
-        const hit = name.includes(q) || (grp&&grp.specs.some(s=>(s.label||'').includes(q)));
-        if(!hit) return;
-      }
-      groupHtml+=renderMatGroup(name);
+    c.items.forEach(it=>{
+      if(q){ const grp=m.items[it.name]; const hit=it.name.includes(q)||(grp&&(grp.specs||[]).some(s=>(s.label||'').includes(q))); if(!hit)return; }
+      groupHtml+=renderMatGroup(it.name);
     });
     if(q && !groupHtml) return;
-    if(q) html+=`<div class="muted" style="font-weight:700;margin:10px 2px 2px">${esc(c.name)}</div>`;
+    if(q || view.matEdit){
+      const ctl=view.matEdit?`<span style="margin-left:auto;display:flex;gap:2px"><button class="del" onclick="renameCatPrompt('${c.id}')">✎</button><button class="del" onclick="moveCat('${c.id}',-1)">▲</button><button class="del" onclick="moveCat('${c.id}',1)">▼</button><button class="del" onclick="delCat('${c.id}')">🗑</button></span>`:'';
+      html+=`<div class="cat-bar"><span style="font-weight:700">${esc(c.name)}</span>${ctl}</div>`;
+    }
     html+=groupHtml;
-    if(!q) html+=`<button class="btn ghost sm" style="margin:10px 2px 4px" onclick="openAddCustomMat('${c.key}')">＋ 新增自訂材料</button>`;
+    if(!q) html+=`<button class="btn ghost sm" style="margin:10px 2px 4px" onclick="addItemPrompt('${c.id}')">＋ 新增品項</button>`;
   });
   document.getElementById('matList').innerHTML=html||`<div class="empty">查無品項</div>`;
 }
@@ -879,7 +892,7 @@ function renderMatGroup(name){
   const def=getMatDef(name);
   const grp=matStore().items[name];
   const specs=grp?grp.specs:[];
-  const perBox = grp ? grp.perBox : (def.perBox||null);
+  const perBox = def.perBox||null;
   const isBox = perBox && perBox>0;
   const unit=def.unit||'';
   const boxCfg = isBox
@@ -908,9 +921,9 @@ function renderMatGroup(name){
   });
   const chips=(def.presets||[]).map(p=>`<button class="preset-chip" onclick="addSpec('${esc(name)}','${esc(p)}')">＋${esc(p)}</button>`).join('')
     + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂</button>`;
-  const delBtn = def.custom ? `<button class="del" onclick="delCustomItem('${esc(name)}')" title="刪除自訂材料">🗑</button>` : '';
+  const editCtl = view.matEdit ? `<span style="display:flex;gap:2px"><button class="del" onclick="renameItemPrompt('${esc(name)}')">✎</button><button class="del" onclick="moveItem('${esc(name)}',-1)">▲</button><button class="del" onclick="moveItem('${esc(name)}',1)">▼</button><button class="del" onclick="delItem('${esc(name)}')">🗑</button></span>` : '';
   return `<div class="mat-group">
-    <div class="mg-head"><div class="t">${esc(name)} <small>${esc(unit)}</small>${def.custom?' <span class="custom-tag">自訂</span>':''}</div><div style="display:flex;align-items:center;gap:6px">${boxCfg}${delBtn}</div></div>
+    <div class="mg-head"><div class="t">${esc(name)} <small>${esc(unit)}</small></div><div style="display:flex;align-items:center;gap:6px">${boxCfg}${editCtl}</div></div>
     ${rows}
     <div class="presets">${chips}</div>
   </div>`;
@@ -923,12 +936,12 @@ function setSpec(name,sid,field,v){
   else { s[field]=(v===''?'':(parseFloat(v)||0)); if(field==='actual'&&v!=='') s.checked=true; }
   saveState(); renderMat();
 }
-function setPerBox(name,v){ matItem(name).perBox=parseFloat(v)||0; saveState(); renderMat(); }
+function setPerBox(name,v){ const def=getMatDef(name); if(def) def.perBox=parseFloat(v)||0; saveState(); renderMat(); }
 function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); renderMat(); } }
 
 /* ===== 購物車下單 / 材料訂單 ===== */
 function ordStore(){ if(!state.orders)state.orders={}; const sid=state.activeSiteId; if(!state.orders[sid])state.orders[sid]=[]; return state.orders[sid]; }
-function allItemNames(){ const s=matStore(); const names=[]; MAT_CATS.forEach(c=>c.items.forEach(it=>names.push(it.name))); s.customItems.forEach(ci=>names.push(ci.name)); return [...new Set(names)]; }
+function allItemNames(){ const names=[]; catalogStore().forEach(c=>c.items.forEach(it=>names.push(it.name))); return [...new Set(names)]; }
 function setMatMode(m){
   view.matMode=m;
   document.getElementById('matListView').style.display = m==='orders'?'none':'block';
