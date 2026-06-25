@@ -284,11 +284,21 @@ textarea.inp{resize:vertical; min-height:60px}
 .bk-warn{color:var(--red); font-weight:700; margin-top:4px}
 .bk-ok{color:#1a8c3a; font-weight:700; margin-top:4px}
 
-/* ===== 照片紀錄 ===== */
+/* ===== 照片紀錄（直接編輯卡片）===== */
+.pr-card{padding:12px 14px}
+.pr-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+.pr-top .del{color:var(--red); font-size:16px}
 .pr-body{display:flex; gap:12px; align-items:flex-start}
-.pr-thumb{width:84px; height:84px; flex:none; border-radius:10px; overflow:hidden; background:var(--inp); border:1px solid var(--border)}
+.pr-left{flex:none; display:flex; flex-direction:column; align-items:center; gap:4px}
+.pr-thumb{width:96px; height:96px; border-radius:10px; overflow:hidden; background:var(--inp); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative}
 .pr-thumb img{width:100%; height:100%; object-fit:cover; display:block}
-.pr-fields{flex:1; min-width:0; font-size:14px}
+.pr-ph{color:var(--text2); font-size:11px}
+.pr-move{display:flex; gap:6px}
+.pr-move .del{font-size:14px; padding:2px 8px; background:var(--inp); border-radius:7px}
+.pr-fields{flex:1; min-width:0}
+.pr-frow{display:flex; align-items:center; gap:8px; margin-bottom:7px}
+.pr-frow>span{width:34px; flex:none; font-size:12px; color:var(--text2); font-weight:600}
+.pr-frow .inp{padding:8px 10px; font-size:14px}
 
 /* ===== A4 報告 ===== */
 #reportOverlay{position:fixed; inset:0; z-index:300; background:var(--bg); display:none; flex-direction:column; overflow-y:auto}
@@ -434,7 +444,7 @@ textarea.inp{resize:vertical; min-height:60px}
     <div style="font-weight:800;font-size:17px">照片</div>
     <div style="display:flex;gap:8px">
       <button class="btn ghost sm" onclick="openReportPreview()">📤 轉PDF傳LINE</button>
-      <button class="btn sm" onclick="openPhotoRecForm()">＋ 照片</button>
+      <button class="btn sm" onclick="addPhotoRec()">＋ 照片</button>
     </div>
   </div>
   <div id="photoRecList"></div>
@@ -1267,52 +1277,39 @@ function renderPhotoRecs(){
   const recs=photoRecStore();
   const box=document.getElementById('photoRecList');
   if(!recs.length){ box.innerHTML=`<div class="empty">還沒有照片<br>點右上「＋ 照片」開始</div>`; return; }
-  box.innerHTML=recs.map(r=>`<div class="log-card">
+  box.innerHTML=recs.map((r,i)=>photoRecCard(r,i)).join('');
+  recs.forEach(r=>loadPhotoThumb(r));
+}
+function photoRecCard(r,i){
+  return `<div class="card pr-card">
+    <div class="pr-top"><span style="font-weight:700">第 ${i+1} 張</span><button class="del" onclick="delPhotoRec('${r.id}')">✕</button></div>
     <div class="pr-body">
-      <div class="pr-thumb" id="prthumb-${r.id}"></div>
+      <div class="pr-left">
+        <label class="pr-thumb">
+          <input type="file" accept="image/*" style="display:none" onchange="setPhotoForRec('${r.id}',this.files)">
+          <img id="prt-${r.id}" style="display:none">
+          <span class="pr-ph" id="prph-${r.id}">點選照片</span>
+        </label>
+        <div class="pr-move"><button class="del" onclick="movePhotoRec('${r.id}',-1)">▲</button><button class="del" onclick="movePhotoRec('${r.id}',1)">▼</button></div>
+      </div>
       <div class="pr-fields">
-        <div style="font-weight:700">${esc(r.item||'(未填項目)')}</div>
-        <div class="muted">${esc(r.date||'')}${r.location?' ｜ '+esc(r.location):''}</div>
-        ${r.desc?`<div style="margin-top:2px">${esc(r.desc)}</div>`:''}
+        <div class="pr-frow"><span>項目</span><input class="inp" value="${esc(r.item||'')}" onchange="setPhotoField('${r.id}','item',this.value)" placeholder="例：撒水管持壓"></div>
+        <div class="pr-frow"><span>日期</span><input class="inp" type="date" value="${esc(r.date||todayStr())}" onchange="setPhotoField('${r.id}','date',this.value)"></div>
+        <div class="pr-frow"><span>位置</span><input class="inp" value="${esc(r.location||'')}" onchange="setPhotoField('${r.id}','location',this.value)" placeholder="例：C棟-16F"></div>
+        <div class="pr-frow"><span>說明</span><input class="inp" value="${esc(r.desc||'')}" onchange="setPhotoField('${r.id}','desc',this.value)" placeholder="例：施工中／施工完成"></div>
       </div>
     </div>
-    <div style="margin-top:8px;display:flex;gap:8px">
-      <button class="btn ghost sm" onclick="openPhotoRecForm('${r.id}')">編輯</button>
-      <button class="btn gray sm" onclick="delPhotoRec('${r.id}')">刪除</button>
-    </div>
-  </div>`).join('');
-  recs.forEach(async r=>{ if(!r.photoId)return; try{ const rec=await photoGet(r.photoId); if(rec&&rec.blob){ const el=document.getElementById('prthumb-'+r.id); if(el){ const u=URL.createObjectURL(rec.blob); el.innerHTML=`<img src="${u}" onclick="viewPhoto('${u}')">`; } } }catch(e){} });
+  </div>`;
 }
-let _prPhoto=null, _prEditId=null;
-function vtrim(id){ const el=document.getElementById(id); return el?(el.value||'').trim():''; }
-function openPhotoRecForm(id){
-  const editing=id?photoRecStore().find(r=>r.id===id):null;
-  const cur=editing||{item:'',date:todayStr(),location:'',desc:'',photoId:null};
-  _prEditId=id||null; _prPhoto=null;
-  openModal(`<h3>${editing?'編輯':'新增'}照片 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="photo-strip" id="prPhotoStrip"></div>
-    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" style="display:none" onchange="setPrPhoto(this.files)"></label>
-    <label class="fld"><span>項目</span><input class="inp" id="prItem" value="${esc(cur.item)}" placeholder="例：輕隔間封板"></label>
-    <label class="fld"><span>日期</span><input class="inp" type="date" id="prDate" value="${esc(cur.date)}"></label>
-    <label class="fld"><span>位置</span><input class="inp" id="prLoc" value="${esc(cur.location)}" placeholder="例：C棟-16F"></label>
-    <label class="fld"><span>說明</span><input class="inp" id="prDesc" value="${esc(cur.desc)}" placeholder="例：施工中／驗收完成"></label>
-    <button class="btn full" onclick="savePhotoRec()">儲存</button>`);
-  renderPrPhotoStrip();
-  if(editing&&editing.photoId){ (async()=>{ try{ const rec=await photoGet(editing.photoId); if(rec&&rec.blob){ _prPhoto={id:editing.photoId, url:URL.createObjectURL(rec.blob), existing:true}; renderPrPhotoStrip(); } }catch(e){} })(); }
+async function loadPhotoThumb(r){
+  if(!r.photoId)return;
+  try{ const rec=await photoGet(r.photoId); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); const img=document.getElementById('prt-'+r.id), ph=document.getElementById('prph-'+r.id); if(img){ img.src=u; img.style.display='block'; } if(ph) ph.style.display='none'; } }catch(e){}
 }
-function setPrPhoto(files){ const f=files&&files[0]; if(!f)return; _prPhoto={id:uid(), blob:f, url:URL.createObjectURL(f)}; renderPrPhotoStrip(); }
-function renderPrPhotoStrip(){ const el=document.getElementById('prPhotoStrip'); if(!el)return; el.innerHTML = (_prPhoto&&_prPhoto.url) ? `<div class="thumb" style="width:110px;height:110px"><img src="${_prPhoto.url}"></div>` : '<span class="muted">尚無照片</span>'; }
-async function savePhotoRec(){
-  const data={ item:vtrim('prItem'), date:document.getElementById('prDate').value||todayStr(), location:vtrim('prLoc'), desc:vtrim('prDesc') };
-  let photoId=null;
-  if(_prPhoto){ photoId=_prPhoto.id; if(_prPhoto.blob){ try{ await photoPut(_prPhoto.id,_prPhoto.blob,{date:data.date}); }catch(e){} } }
-  data.photoId=photoId;
-  const store=photoRecStore();
-  if(_prEditId){ const r=store.find(x=>x.id===_prEditId); const old=r?r.photoId:null; if(r)Object.assign(r,data); if(old && old!==photoId){ photoDel(old).catch(()=>{}); } }
-  else { store.push({id:uid(), ...data}); }
-  saveState(); closeModal(); renderPhotoRecs(); toast('已儲存');
-}
-function delPhotoRec(id){ if(!confirm('刪除此照片紀錄？'))return; const r=photoRecStore().find(x=>x.id===id); if(r&&r.photoId)photoDel(r.photoId).catch(()=>{}); state.photoRecs[state.activeSiteId]=photoRecStore().filter(x=>x.id!==id); saveState(); renderPhotoRecs(); }
+function setPhotoField(id,f,v){ const r=photoRecStore().find(x=>x.id===id); if(r){ r[f]=(typeof v==='string'?v.trim():v); saveState(); } }
+function movePhotoRec(id,dir){ const arr=photoRecStore(); const i=arr.findIndex(x=>x.id===id); const j=i+dir; if(j<0||j>=arr.length)return; [arr[i],arr[j]]=[arr[j],arr[i]]; saveState(); renderPhotoRecs(); }
+function addPhotoRec(){ photoRecStore().push({id:uid(),item:'',date:todayStr(),location:'',desc:'',photoId:null}); saveState(); renderPhotoRecs(); }
+async function setPhotoForRec(id,files){ const f=files&&files[0]; if(!f)return; const r=photoRecStore().find(x=>x.id===id); if(!r)return; const pid=uid(); try{ await photoPut(pid,f,{date:r.date}); }catch(e){} if(r.photoId)photoDel(r.photoId).catch(()=>{}); r.photoId=pid; saveState(); renderPhotoRecs(); }
+function delPhotoRec(id){ if(!confirm('刪除這張照片？'))return; const r=photoRecStore().find(x=>x.id===id); if(r&&r.photoId)photoDel(r.photoId).catch(()=>{}); state.photoRecs[state.activeSiteId]=photoRecStore().filter(x=>x.id!==id); saveState(); renderPhotoRecs(); }
 async function openReportPreview(){
   const h=reportHead(); const recs=photoRecStore();
   if(!recs.length) return toast('還沒有照片');
