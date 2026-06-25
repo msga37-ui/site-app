@@ -318,7 +318,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .rpt-tbl th,.rpt-tbl td{border:1px solid #ddd; padding:8px 10px; text-align:left; vertical-align:top}
 .rpt-tbl th{background:#fff; width:54px; white-space:nowrap; font-weight:700; color:#444}
 .rpt-tbl tr:last-child td,.rpt-tbl tr:last-child th{height:46px}
-.rpt-img{height:185px}
+.rpt-img{min-height:150px}
 
 @media print{
   body > *:not(#reportOverlay){ display:none !important; }
@@ -327,7 +327,7 @@ textarea.inp{resize:vertical; min-height:60px}
   .rpt-pages{ padding:0; gap:0; zoom:1 !important }
   .rpt-page{ max-width:none; width:auto; box-shadow:none; border-radius:0; padding:0; page-break-after:always }
   .rpt-page:last-child{ page-break-after:auto }
-  .rpt-img{ height:6.3cm }
+  .rpt-img{ min-height:6cm }
 }
 @page{ size:A4 portrait; margin:12mm }
 
