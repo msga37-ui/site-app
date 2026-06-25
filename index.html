@@ -393,7 +393,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
     <div style="font-weight:800;font-size:17px" id="dayTitle">當日記錄</div>
     <div style="display:flex;gap:6px">
-      <button class="btn green sm" id="dayShareBtn" onclick="shareDay(view.selDate)">📤 LINE</button>
+      <button class="btn green sm" id="dayShareBtn" onclick="shareDay(view.selDate)">LINE</button>
       <button class="btn sm" onclick="newEntry()">＋ 新增</button>
     </div>
   </div>
@@ -1023,28 +1023,36 @@ function dayShareText(date, reason){
   let out='每日施工日誌\n【案場】'+activeSite().name+'\n【日期】'+date+'\n【總人數】'+total+' 人';
   if(!recs.length && !labs.length && !txs.length){ out+='\n\n'+(reason?('【狀況】'+reason):'（本日無施工）'); return out; }
   if(recs.length){
-    out+='\n\n［施工］';
+    out+='\n\n【施工】';
     recs.forEach(r=>{
       out+='\n〔'+(r.vendor||'未填廠商')+'〕';
       (r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(!p)return; const done=(+p.percent||0)>=100; const parts=[p.work]; if(p.floor)parts.push(p.floor); if(it.headcount)parts.push(it.headcount+'人'); parts.push(done?'✓完成':(p.percent||0)+'%'); out+='\n・'+parts.join(' '); });
-      if(r.note) out+='\n　備註：'+r.note;
+      if(r.note) out+='\n備註：'+r.note;
     });
   }
   if(labs.length){
-    out+='\n\n［點工］';
+    out+='\n\n【點工】';
     labs.forEach(l=>{ out+='\n・'+(l.trade||'')+(l.count?' '+l.count+'名':'')+(l.source?'（'+l.source+'）':'')+(l.reason?' '+l.reason:''); });
   }
   if(txs.length){
-    out+='\n\n［材料異動］';
+    out+='\n\n【材料異動】';
     txs.forEach(t=>{ out+='\n'+txLabel(t.type)+' '+t.item+(t.spec?' '+t.spec:'')+' '+f2(t.qty)+(getMatDef(t.item).unit||''); });
   }
   return out;
 }
-async function shareDay(date){
-  let reason=null;
-  if(!recordsOn(date).length && !laborOn(date).length && !matTxOn(date).length){
-    const r=prompt('本日無施工，輸入停工原因（可留空，例：颱風停工）：',''); if(r===null) return; reason=r.trim();
-  }
+function shareDay(date){
+  if(!recordsOn(date).length && !laborOn(date).length && !matTxOn(date).length){ openStopWorkShare(date); return; }
+  doShareDay(date, null);
+}
+function openStopWorkShare(date){
+  openModal(`<h3>本日無施工 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">輸入停工原因（可留空），按「傳 LINE」轉傳給公司。</div>
+    <label class="fld"><span>停工原因</span><input class="inp" id="stopReason" placeholder="例：颱風停工 / 停電 / 無法進場"></label>
+    <button class="btn full green" onclick="doShareDay('${date}', (document.getElementById('stopReason').value||'').trim())">傳 LINE</button>`);
+  setTimeout(()=>{ const el=document.getElementById('stopReason'); if(el)el.focus(); },80);
+}
+async function doShareDay(date, reason){
+  closeModal();
   const txt=dayShareText(date, reason);
   let files=[];
   for(const r of recordsOn(date)){ if(r.photos&&r.photos.length){ for(const pid of r.photos){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob],pid+'.'+ext,{type:t})); } }catch(e){} } } }
