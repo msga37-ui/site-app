@@ -159,6 +159,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .tx-tag{font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; flex:none}
 .tx-tag.in{background:rgba(52,199,89,.16); color:#1a8c3a}
 .tx-tag.out{background:rgba(255,149,0,.16); color:#a85d00}
+.tx-tag.ret{background:rgba(175,82,222,.16); color:#7d3aa8}
 .tx-info{flex:1; font-size:14px}
 .sum-cat{font-weight:800; font-size:14px; color:var(--text2); margin:14px 2px 4px}
 .sum-row{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
@@ -777,17 +778,18 @@ function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDay(); }
 function matTxOn(date){ return matTxStore().filter(t=>t.date===date); }
 function matTxGroupCard(type, list){
   const lines=list.map(t=>{ const unit=getMatDef(t.item).unit||''; return `<div class="rc-line"><b>${esc(t.item)}</b> <span class="muted">${esc(t.spec||'')}</span> <span class="rc-pct">${f2(t.qty)}${esc(unit)}</span></div>`; }).join('');
-  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">${type==='in'?'📦 進料':'📤 已用'}</div><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
+  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">${type==='in'?'📦 進料':type==='out'?'📤 已用':'↩️ 退料'}</div><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
 }
 function renderDay(){
   document.getElementById('dayTitle').textContent=`${view.selDate} 記錄`;
   const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate), labs=laborOn(view.selDate);
-  const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out');
+  const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out'), rets=txs.filter(t=>t.type==='ret');
   const box=document.getElementById('dayLogs');
   if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
   let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
   if(ins.length) html += matTxGroupCard('in', ins);
   if(outs.length) html += matTxGroupCard('out', outs);
+  if(rets.length) html += matTxGroupCard('ret', rets);
   html += labs.map(laborDayCard).join('');
   box.innerHTML = html;
   loadCardThumbs(recs);
@@ -1165,11 +1167,11 @@ function openMatDetail(name){
   const txs=itemTxs(name);
   // 各規格 進/用/剩
   const map={}, order=[];
-  txs.forEach(t=>{ const k=t.spec||'(未分規格)'; if(!(k in map)){map[k]={in:0,out:0};order.push(k);} map[k][t.type==='in'?'in':'out']+=(+t.qty||0); });
-  const specRows = order.length ? order.map(k=>{ const s=map[k]; return `<div class="inv-row"><span class="inv-spec">${esc(k)}</span><span class="inv-nums">進${f2(s.in)}／用${f2(s.out)}／<b>剩${f2(s.in-s.out)}</b></span></div>`; }).join('') : '<div class="muted" style="margin:4px 0">尚無進料/已用紀錄</div>';
+  txs.forEach(t=>{ const k=t.spec||'(未分規格)'; if(!(k in map)){map[k]={in:0,out:0,ret:0};order.push(k);} map[k][t.type]=(map[k][t.type]||0)+(+t.qty||0); });
+  const specRows = order.length ? order.map(k=>{ const s=map[k]; return `<div class="inv-row"><span class="inv-spec">${esc(k)}</span><span class="inv-nums">進${f2(s.in)}／用${f2(s.out)}${s.ret?'／退'+f2(s.ret):''}／<b>剩${f2(s.in-s.out-s.ret)}</b></span></div>`; }).join('') : '<div class="muted" style="margin:4px 0">尚無進料/已用紀錄</div>';
   const totalBal=f2(itemBalance(name));
   const sorted=txs.slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
-  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${t.type==='in'?'進料':'已用'}</span><span class="tx-info">${esc(t.date)}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
+  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${txLabel(t.type)}</span><span class="tx-info">${esc(t.date)}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
   openModal(`<h3>${esc(name)} <small style="color:var(--text2);font-size:13px">${esc(unit)}</small> <span class="x" onclick="closeMatDetail()">×</span></h3>
     <div class="inv-summary">
       <div class="muted" style="font-size:12px">結存合計</div>
@@ -1179,6 +1181,7 @@ function openMatDetail(name){
     <div style="display:flex;gap:8px;margin:14px 0">
       <button class="btn full green" onclick="openTxForm('${esc(name)}','in')">＋ 進料</button>
       <button class="btn full" onclick="openTxForm('${esc(name)}','out')">＋ 已用</button>
+      <button class="btn full" style="background:var(--purple);color:#fff" onclick="openTxForm('${esc(name)}','ret')">＋ 退料</button>
     </div>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:6px 2px 4px">進出紀錄</div>
     ${txList}
@@ -1187,13 +1190,14 @@ function openMatDetail(name){
 function openTxForm(name, type){
   const def=getMatDef(name);
   const presets=(def.presets||[]);
+  const tl=txLabel(type);
   const chips=presets.map(p=>`<button type="button" class="preset-chip" onclick="document.getElementById('txSpec').value='${esc(p)}'">${esc(p)}</button>`).join('');
-  openModal(`<h3>${type==='in'?'＋ 進料':'＋ 已用'} — ${esc(name)} <span class="x" onclick="openMatDetail('${esc(name)}')">×</span></h3>
+  openModal(`<h3>＋ ${tl} — ${esc(name)} <span class="x" onclick="openMatDetail('${esc(name)}')">×</span></h3>
     <label class="fld"><span>日期</span><input class="inp" type="date" id="txDate" value="${todayStr()}"></label>
     <label class="fld"><span>規格（可留空）</span><input class="inp" id="txSpec" placeholder="例：9mm"></label>
     ${presets.length?`<div class="presets" style="margin:-4px 0 10px">${chips}</div>`:''}
     <label class="fld"><span>數量（${esc(def.unit||'')}）</span><input class="inp" id="txQty" type="number" inputmode="decimal" placeholder="例：300"></label>
-    <button class="btn full${type==='in'?' green':''}" onclick="saveTx('${esc(name)}','${type}')">儲存${type==='in'?'進料':'已用'}</button>`);
+    <button class="btn full${type==='in'?' green':''}" style="${type==='ret'?'background:var(--purple);color:#fff':''}" onclick="saveTx('${esc(name)}','${type}')">儲存${tl}</button>`);
   setTimeout(()=>{ const el=document.getElementById('txQty'); if(el)el.focus(); },80);
 }
 function saveTx(name, type){
@@ -1202,7 +1206,7 @@ function saveTx(name, type){
   const qty=parseFloat(document.getElementById('txQty').value)||0;
   if(!qty) return toast('請輸入數量');
   matTxStore().push({id:uid(), date, type, item:name, spec, qty});
-  view.selDate=date; saveState(); openMatDetail(name); toast(type==='in'?'已記進料':'已記已用');
+  view.selDate=date; saveState(); openMatDetail(name); toast('已記'+txLabel(type));
 }
 function delTx(id, name){ if(!confirm('刪除此筆紀錄？'))return; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.id!==id); saveState(); openMatDetail(name); }
 function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); afterMatChange(); }
@@ -1234,6 +1238,7 @@ function setMatMode(m){
 function matTxStore(){ if(!state.matTx)state.matTx={}; const sid=state.activeSiteId; if(!state.matTx[sid])state.matTx[sid]=[]; return state.matTx[sid]; }
 function itemTxs(name){ return matTxStore().filter(t=>t.item===name); }
 function itemBalance(name){ return itemTxs(name).reduce((b,t)=>b+(t.type==='in'?(+t.qty||0):-(+t.qty||0)),0); }
+function txLabel(t){ return {in:'進料',out:'已用',ret:'退料'}[t]||t; }
 function renderMatSummary(){
   const cats=catalogStore();
   let html='';
@@ -1243,10 +1248,11 @@ function renderMatSummary(){
       const txs=itemTxs(it.name); if(!txs.length) return;
       const inSum=f2(txs.filter(t=>t.type==='in').reduce((a,t)=>a+(+t.qty||0),0));
       const outSum=f2(txs.filter(t=>t.type==='out').reduce((a,t)=>a+(+t.qty||0),0));
-      const bal=f2(inSum-outSum); const unit=getMatDef(it.name).unit||'';
+      const retSum=f2(txs.filter(t=>t.type==='ret').reduce((a,t)=>a+(+t.qty||0),0));
+      const bal=f2(inSum-outSum-retSum); const unit=getMatDef(it.name).unit||'';
       rows+=`<div class="sum-row" onclick="openMatDetail('${esc(it.name)}')">
         <span class="sum-name">${esc(it.name)}</span>
-        <span class="sum-nums">進${inSum} 用${outSum} <b>剩${bal}</b><small>${esc(unit)}</small></span>
+        <span class="sum-nums">進${inSum} 用${outSum}${(+retSum)>0?' 退'+retSum:''} <b>剩${bal}</b><small>${esc(unit)}</small></span>
       </div>`;
     });
     if(rows) html+=`<div class="sum-cat">${esc(c.name)}</div>${rows}`;
@@ -1727,7 +1733,7 @@ function exportCSV(){
   ((state.labor||{})[sid]||[]).filter(l=>inMonth(l.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(l=>row([l.date, l.trade, l.source, l.count===0?0:(l.count||''), l.reason||'']));
   L.push('');
   L.push('材料進出'); row(['日期','品項','規格','類型','數量']);
-  ((state.matTx||{})[sid]||[]).filter(t=>inMonth(t.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(t=>row([t.date, t.item, t.spec||'', t.type==='in'?'進料':'已用', t.qty||0]));
+  ((state.matTx||{})[sid]||[]).filter(t=>inMonth(t.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(t=>row([t.date, t.item, t.spec||'', txLabel(t.type), t.qty||0]));
   const csv='﻿'+L.join('\r\n');
   const fname=`${site.name}_${ym}.csv`;
   const file=new File([csv], fname, {type:'text/csv;charset=utf-8'});
