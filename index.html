@@ -365,7 +365,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div class="tb-row1">
     <div class="logo">泰郡<small>工務系統</small></div>
     <div style="display:flex;gap:6px">
-      <button class="icon-btn report-btn" onclick="openQuickReport()" title="現場快報">📣</button>
+      <button class="icon-btn report-btn" onclick="openQuickReport()" title="現場阻礙">🚧</button>
       <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
       <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
       <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
@@ -1497,30 +1497,42 @@ async function shareLabor(id){
   toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
 }
 
-/* =================== 現場快報（快拍 → 打包轉傳 LINE） =================== */
+/* =================== 現場阻礙（快拍 → 打包轉傳 LINE） =================== */
 const QR_REASONS=['設計變更','施工配合','緊急現場問題','一般通報'];
+function reasonList(){ if(!state.reportReasons) state.reportReasons=QR_REASONS.slice(); return state.reportReasons; }
 let _qr=null;
-function openQuickReport(){ _qr={ siteName:activeSite().name, sub:'', reason:QR_REASONS[1], desc:'', photos:[] }; showQuickReport(); }
+function openQuickReport(){ _qr={ siteName:activeSite().name, location:'', sub:'', reason:(reasonList()[0]||''), desc:'', photos:[] }; showQuickReport(); }
+function openReasonManage(){
+  const list=reasonList();
+  openModal(`<h3>管理事由 <span class="x" onclick="showQuickReport()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">現場阻礙的主要事由清單。</div>
+    ${list.map((t,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(t)}</div><button class="del" onclick="delReason(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無事由</div>'}
+    <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="reasonNew" placeholder="新增事由名稱"><button class="btn" onclick="addReason()">新增</button></div>
+    <button class="btn ghost full" style="margin-top:14px" onclick="showQuickReport()">完成</button>`);
+}
+function addReason(){ const n=(document.getElementById('reasonNew').value||'').trim(); if(!n)return toast('請輸入名稱'); const list=reasonList(); if(!list.includes(n))list.push(n); _qr.reason=n; saveState(); openReasonManage(); }
+function delReason(i){ reasonList().splice(i,1); saveState(); openReasonManage(); }
 function showQuickReport(){
   const siteChips=state.sites.map(s=>`<button type="button" class="site-chip sm${s.name===_qr.siteName?' on':''}" onclick="_qr.siteName=this.textContent;showQuickReport()">${esc(s.name)}</button>`).join('');
-  const reasonChips=QR_REASONS.map(r=>`<button type="button" class="opt${r===_qr.reason?' on':''}" onclick="_qr.reason='${r}';showQuickReport()">${r}</button>`).join('');
+  const reasonChips=reasonList().map(r=>`<button type="button" class="opt${r===_qr.reason?' on':''}" onclick="_qr.reason='${esc(r)}';showQuickReport()">${esc(r)}</button>`).join('');
   const photos=_qr.photos.length?_qr.photos.map((p,i)=>`<div class="thumb"><img src="${p.url}"><button class="thumb-x" onclick="qrDelPhoto(${i})">×</button></div>`).join(''):'<span class="muted">尚無照片</span>';
-  openModal(`<h3>📣 現場快報 <span class="x" onclick="closeModal()">×</span></h3>
+  openModal(`<h3>🚧 現場阻礙 <span class="x" onclick="closeModal()">×</span></h3>
     <div class="muted" style="margin-bottom:10px">現場快拍 → 一鍵打包轉傳給公司內勤（不會存進系統，純轉傳）。</div>
     <div class="photo-strip" id="qrStrip">${photos}</div>
     <label class="btn ghost full" style="margin-bottom:14px">📷 拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addQrPhotos(this.files);this.value=''"></label>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">案場</div>
     <div class="form-site-chips">${siteChips}</div>
-    <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">主要事由</div>
+    <label class="fld"><span>位置</span><input class="inp" value="${esc(_qr.location)}" onchange="_qr.location=this.value" placeholder="例：C棟-16F"></label>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 4px"><span style="font-size:12px;font-weight:700;color:var(--text2)">主要事由</span><button class="btn ghost sm" onclick="openReasonManage()">⚙ 管理事由</button></div>
     <div class="item-pick" style="margin-bottom:12px">${reasonChips}</div>
-    <label class="fld"><span>涉及下包商</span><input class="inp" value="${esc(_qr.sub)}" onchange="_qr.sub=this.value" placeholder="例：阿明木工"></label>
+    <label class="fld"><span>會勘單位</span><input class="inp" value="${esc(_qr.sub)}" onchange="_qr.sub=this.value" placeholder="例：阿明木工"></label>
     <label class="fld"><span>簡短說明</span><textarea class="inp" onchange="_qr.desc=this.value" placeholder="例：4樓A區明天要灌漿，請木工配合退場">${esc(_qr.desc)}</textarea></label>
     <button class="btn green full" onclick="sendQuickReport()">📤 打包轉傳給公司內勤</button>`);
 }
 async function addQrPhotos(files){ for(const f of [...files]){ const blob=await normalizeImage(f); _qr.photos.push({blob, url:URL.createObjectURL(blob)}); } showQuickReport(); }
 function qrDelPhoto(i){ const p=_qr.photos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _qr.photos.splice(i,1); showQuickReport(); }
 async function sendQuickReport(){
-  const txt=`【案場】${_qr.siteName}\n【事由】${_qr.reason}${_qr.sub?'\n【下包商】'+_qr.sub:''}${_qr.desc?'\n【說明】'+_qr.desc:''}`;
+  const txt=`【案場】${_qr.siteName}${_qr.location?'\n【位置】'+_qr.location:''}\n【事由】${_qr.reason}${_qr.sub?'\n【會勘單位】'+_qr.sub:''}${_qr.desc?'\n【說明】'+_qr.desc:''}`;
   const files=_qr.photos.map((p,i)=>new File([p.blob], 'report'+(i+1)+'.jpg', {type:p.blob.type||'image/jpeg'}));
   try{ await navigator.clipboard.writeText(txt); }catch(e){}
   if(navigator.share){ const payload={text:txt}; if(files.length&&navigator.canShare&&navigator.canShare({files}))payload.files=files;
