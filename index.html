@@ -1523,10 +1523,10 @@ function showQuickReport(){
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">案場</div>
     <div class="form-site-chips">${siteChips}</div>
     <label class="fld"><span>位置</span><input class="inp" value="${esc(_qr.location)}" onchange="_qr.location=this.value" placeholder="例：C棟-16F"></label>
+    <label class="fld"><span>會勘單位</span><input class="inp" value="${esc(_qr.sub)}" onchange="_qr.sub=this.value" placeholder="例：阿明木工"></label>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 4px"><span style="font-size:12px;font-weight:700;color:var(--text2)">主要事由</span><button class="btn ghost sm" onclick="openReasonManage()">⚙ 管理事由</button></div>
     <div class="item-pick" style="margin-bottom:12px">${reasonChips}</div>
-    <label class="fld"><span>會勘單位</span><input class="inp" value="${esc(_qr.sub)}" onchange="_qr.sub=this.value" placeholder="例：阿明木工"></label>
-    <label class="fld"><span>簡短說明</span><textarea class="inp" onchange="_qr.desc=this.value" placeholder="例：4樓A區明天要灌漿，請木工配合退場">${esc(_qr.desc)}</textarea></label>
+    <label class="fld"><span>說明</span><textarea class="inp" onchange="_qr.desc=this.value" placeholder="例：4樓A區明天要灌漿，請木工配合退場">${esc(_qr.desc)}</textarea></label>
     <button class="btn green full" onclick="sendQuickReport()">📤 打包轉傳給公司內勤</button>`);
 }
 async function addQrPhotos(files){ for(const f of [...files]){ const blob=await normalizeImage(f); _qr.photos.push({blob, url:URL.createObjectURL(blob)}); } showQuickReport(); }
@@ -1654,9 +1654,18 @@ function openSettings(){
   const theme=localStorage.getItem('wm_theme')||'light';
   const ch=+localStorage.getItem('wm_lastChange')||0, bk=+localStorage.getItem('wm_lastBackup')||0;
   const need = ch>bk;
+  const ymNow=(new Date()).getFullYear()+'-'+String((new Date()).getMonth()+1).padStart(2,'0');
+  const siteOpts=state.sites.map(s=>`<option value="${s.id}"${s.id===state.activeSiteId?' selected':''}>${esc(s.name)}</option>`).join('');
   openModal(`<h3>設定 <span class="x" onclick="closeModal()">×</span></h3>
     <div class="set-row"><span>外觀模式</span><button class="btn ghost sm" onclick="toggleTheme()">${theme==='dark'?'☀️ 切換為淺色':'🌙 切換為深色'}</button></div>
     <div style="border-top:1px solid var(--border);margin:12px 0"></div>
+    <div class="muted" style="margin-bottom:8px">匯出資料（CSV，可用 Excel 開啟）</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <select class="inp" id="xlSite">${siteOpts}</select>
+      <input class="inp" id="xlMonth" type="month" value="${ymNow}" style="max-width:150px">
+    </div>
+    <button class="btn full" style="margin-bottom:16px" onclick="exportCSV()">📊 匯出 Excel（CSV）</button>
+    <div style="border-top:1px solid var(--border);margin:0 0 12px"></div>
     <div class="muted" style="margin-bottom:10px">資料只存在這支手機，建議定期備份到「檔案」或 LINE Keep。</div>
     <div class="bk-times${need?' need':''}">
       <div>最後變動：<b>${fmtTime(ch)}</b></div>
@@ -1668,6 +1677,32 @@ function openSettings(){
       <input type="file" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
     </label>
     <div class="warn" style="margin-top:0">⚠️ 請<b>不要刪除主畫面圖示</b> —— 刪除會清掉手機上的資料。</div>`);
+}
+function csvEsc(v){ v=String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function exportCSV(){
+  const sid=document.getElementById('xlSite').value;
+  const ym=document.getElementById('xlMonth').value;
+  if(!ym) return toast('請選擇月份');
+  const site=state.sites.find(s=>s.id===sid)||activeSite();
+  const inMonth=d=>String(d||'').slice(0,7)===ym;
+  const L=[]; const row=arr=>L.push(arr.map(csvEsc).join(','));
+  L.push(csvEsc(site.name+' '+ym+' 匯出')); L.push('');
+  L.push('施工記錄'); row(['日期','廠商','工項','樓層','人數','進度%']);
+  ((state.records||{})[sid]||[]).filter(r=>inMonth(r.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(r=>{
+    (r.items||[]).forEach(it=>{ const p=((state.progress||{})[sid]||[]).find(x=>x.id===it.progressId)||{}; row([r.date, r.vendor, p.work||'', p.floor||'', it.headcount===0?0:(it.headcount||''), p.percent||0]); });
+  });
+  L.push('');
+  L.push('點工'); row(['日期','工種','廠商','人數','工作內容']);
+  ((state.labor||{})[sid]||[]).filter(l=>inMonth(l.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(l=>row([l.date, l.trade, l.source, l.count===0?0:(l.count||''), l.reason||'']));
+  L.push('');
+  L.push('材料進出'); row(['日期','品項','規格','類型','數量']);
+  ((state.matTx||{})[sid]||[]).filter(t=>inMonth(t.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(t=>row([t.date, t.item, t.spec||'', t.type==='in'?'進料':'已用', t.qty||0]));
+  const csv='﻿'+L.join('\r\n');
+  const fname=`${site.name}_${ym}.csv`;
+  const file=new File([csv], fname, {type:'text/csv;charset=utf-8'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ navigator.share({files:[file], title:fname}).catch(()=>{}); }
+  else { const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); }
+  toast('已匯出 '+fname);
 }
 async function exportBackup(){
   toast('正在打包備份…');
