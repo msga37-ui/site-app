@@ -1420,7 +1420,7 @@ function laborCard(l){
   const photoStrip=l.photoId?`<div class="photo-strip" id="lbph-${l.id}"></div>`:'';
   return `<div class="log-card">
     <div class="lc-top"><div style="font-weight:700">🧰 ${esc(l.trade||'點工')}${l.count?' ｜ '+esc(String(l.count))+'名':''}</div><button class="btn green sm" onclick="shareLabor('${l.id}')">LINE</button></div>
-    <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 來源：'+esc(l.source):''}</div>
+    <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 廠商：'+esc(l.source):''}</div>
     ${l.reason?`<div style="margin-top:4px;font-size:14px">${esc(l.reason)}</div>`:''}
     ${photoStrip}
     <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openLaborForm('${l.id}')">編輯</button><button class="btn gray sm" onclick="delLabor('${l.id}')">刪除</button></div>
@@ -1428,7 +1428,7 @@ function laborCard(l){
 }
 async function loadLaborThumb(l){ try{ const rec=await photoGet(l.photoId); if(rec&&rec.blob){ const el=document.getElementById('lbph-'+l.id); if(el){ const u=URL.createObjectURL(rec.blob); el.innerHTML=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } } }catch(e){} }
 function laborDayCard(l){
-  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">🧰 點工：${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">來源：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
+  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">🧰 點工：${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">廠商：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
 }
 let _labor=null, _laborPhoto=null;
 function openLaborForm(id){
@@ -1459,7 +1459,7 @@ function showLaborModal(){
     <label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_labor.date)}" onchange="_labor.date=this.value"></label>
     <label class="fld"><span>工種</span><div style="display:flex;gap:8px"><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select><button class="icon-btn" onclick="openTradeManage()" title="管理工種">⚙</button></div></label>
     <div class="row">
-      <label class="fld"><span>來源/廠商</span><input class="inp" value="${esc(_labor.source)}" onchange="_labor.source=this.value" placeholder="例：阿明臨時工"></label>
+      <label class="fld"><span>廠商</span><input class="inp" value="${esc(_labor.source)}" onchange="_labor.source=this.value" placeholder="例：阿明臨時工"></label>
       <label class="fld"><span>人數</span><input class="inp" type="number" inputmode="numeric" value="${_labor.count}" onchange="_labor.count=(this.value===''?'':+this.value)" placeholder="名"></label>
     </div>
     <label class="fld"><span>工作事由</span><textarea class="inp" onchange="_labor.reason=this.value" placeholder="例：A區矽酸鈣板廢料清理運送、3F隔間局部修改代工">${esc(_labor.reason)}</textarea></label>
@@ -1485,7 +1485,7 @@ async function saveLabor(){
   view.selDate=rec.date; saveState(); closeModal(); renderAll(); switchTab('labor'); toast('點工已儲存');
 }
 function delLabor(id){ if(!confirm('刪除此點工單？'))return; const l=laborStore().find(x=>x.id===id); if(l&&l.photoId)photoDel(l.photoId).catch(()=>{}); state.labor[state.activeSiteId]=laborStore().filter(x=>x.id!==id); saveState(); renderLabor(); renderCalendar(); renderDay(); }
-function laborLineText(l){ return `【點工】${activeSite().name}\n【日期】${l.date}\n【工種】${l.trade||'-'}${l.count?'（'+l.count+'名）':''}\n【來源】${l.source||'-'}\n【工作事由】${l.reason||'-'}`; }
+function laborLineText(l){ return `【點工】${activeSite().name}\n【日期】${l.date}\n【工種】${l.trade||'-'}${l.count?'（'+l.count+'名）':''}\n【廠商】${l.source||'-'}\n【工作事由】${l.reason||'-'}`; }
 async function shareLabor(id){
   const l=laborStore().find(x=>x.id===id); if(!l)return;
   const txt=laborLineText(l); let files=[];
