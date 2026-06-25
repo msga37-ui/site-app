@@ -306,7 +306,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .pr-descrow textarea{min-height:62px; resize:vertical; line-height:1.4}
 
 /* ===== A4 報告 ===== */
-#reportOverlay{position:fixed; inset:0; z-index:300; background:var(--bg); display:none; flex-direction:column; overflow-y:auto}
+#reportOverlay{position:fixed; inset:0; z-index:300; background:var(--bg); display:none; flex-direction:column; overflow-y:auto; overflow-x:hidden}
 #reportOverlay.show{display:flex}
 .rpt-toolbar{position:sticky; top:0; display:flex; gap:10px; justify-content:center; padding:12px; padding-top:calc(12px + env(safe-area-inset-top,0px)); background:var(--bar); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); z-index:2}
 .rpt-pages{padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px}
@@ -342,7 +342,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .modal-bg.show{display:flex}
 .modal{
   background:var(--card); width:100%; border-radius:18px 18px 0 0; padding:18px 16px;
-  padding-bottom:calc(18px + var(--safe-b)); max-height:90vh; overflow-y:auto;
+  padding-bottom:calc(18px + var(--safe-b)); max-height:90vh; overflow-y:auto; overflow-x:hidden;
   animation:slideup .25s ease;
 }
 @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -787,6 +787,7 @@ function renderDay(){
   const box=document.getElementById('dayLogs');
   if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
   let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
+  if(!recs.length && (txs.length||labs.length)) html += `<button class="btn green sm full" style="margin-bottom:12px" onclick="shareDay('${view.selDate}')">LINE 分享當天</button>`;
   if(ins.length) html += matTxGroupCard('in', ins);
   if(outs.length) html += matTxGroupCard('out', outs);
   if(rets.length) html += matTxGroupCard('ret', rets);
@@ -802,7 +803,7 @@ function recordCard(r){
   }).join('');
   const photoStrip=(r.photos&&r.photos.length)?`<div class="photo-strip" id="ph-${r.id}"></div>`:'';
   return `<div class="log-card">
-    <div class="lc-top"><div style="font-weight:700">${esc(r.vendor||'未填廠商')}</div><button class="btn green sm" onclick="shareRecord('${r.id}')">LINE</button></div>
+    <div class="lc-top"><div style="font-weight:700">${esc(r.vendor||'未填廠商')}</div><button class="btn green sm" onclick="shareDay('${r.date}')">LINE</button></div>
     <div class="rc-items">${items||'<span class="muted">未選工項</span>'}</div>
     ${r.note?`<div class="lc-meta">${esc(r.note)}</div>`:''}
     ${photoStrip}
@@ -1013,6 +1014,41 @@ async function shareRecord(id){
   }
   toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
 }
+/* 分享「當天全部」：施工(各廠商)＋點工＋進料/已用/退料 打包成一則 */
+function dayShareText(date){
+  const recs=recordsOn(date), labs=laborOn(date), txs=matTxOn(date);
+  let total=0; recs.forEach(r=>(r.items||[]).forEach(it=>{ total+=(+it.headcount||0); }));
+  let out='每日施工日誌\n【案場】'+activeSite().name+'\n【日期】'+date+'\n【總人數】'+total+' 人';
+  if(recs.length){
+    out+='\n\n［施工］';
+    recs.forEach(r=>{
+      out+='\n〔'+(r.vendor||'未填廠商')+'〕';
+      (r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(!p)return; const done=(+p.percent||0)>=100; const parts=[p.work]; if(p.floor)parts.push(p.floor); if(it.headcount)parts.push(it.headcount+'人'); parts.push(done?'✓完成':(p.percent||0)+'%'); out+='\n・'+parts.join(' '); });
+      if(r.note) out+='\n　備註：'+r.note;
+    });
+  }
+  if(labs.length){
+    out+='\n\n［點工］';
+    labs.forEach(l=>{ out+='\n・'+(l.trade||'')+(l.count?' '+l.count+'名':'')+(l.source?'（'+l.source+'）':'')+(l.reason?' '+l.reason:''); });
+  }
+  if(txs.length){
+    out+='\n\n［材料異動］';
+    txs.forEach(t=>{ const icon=t.type==='in'?'📦進料':t.type==='out'?'📤已用':'↩️退料'; out+='\n'+icon+' '+t.item+(t.spec?' '+t.spec:'')+' '+f2(t.qty)+(getMatDef(t.item).unit||''); });
+  }
+  return out;
+}
+async function shareDay(date){
+  const txt=dayShareText(date);
+  let files=[];
+  for(const r of recordsOn(date)){ if(r.photos&&r.photos.length){ for(const pid of r.photos){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob],pid+'.'+ext,{type:t})); } }catch(e){} } } }
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  if(navigator.share){
+    const payload={text:txt};
+    if(files.length && navigator.canShare && navigator.canShare({files})) payload.files=files;
+    try{ await navigator.share(payload); return; }catch(e){ if(e.name==='AbortError')return; }
+  }
+  toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
+}
 
 /* =================== 材料點收 =================== */
 // 資料模型：materials[sid] = { items: { 品項名:{ perBox:每箱支數|null, specs:[{id,label,ordered,actual,checked}] } } }
@@ -1171,7 +1207,7 @@ function openMatDetail(name){
   const specRows = order.length ? order.map(k=>{ const s=map[k]; return `<div class="inv-row"><span class="inv-spec">${esc(k)}</span><span class="inv-nums">進${f2(s.in)}／用${f2(s.out)}${s.ret?'／退'+f2(s.ret):''}／<b>剩${f2(s.in-s.out-s.ret)}</b></span></div>`; }).join('') : '<div class="muted" style="margin:4px 0">尚無進料/已用紀錄</div>';
   const totalBal=f2(itemBalance(name));
   const sorted=txs.slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
-  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${txLabel(t.type)}</span><span class="tx-info">${esc(t.date)}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
+  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${txLabel(t.type)}</span><span class="tx-info">${esc(t.date)}${t.ts?' '+txTime(t.ts):''}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
   openModal(`<h3>${esc(name)} <small style="color:var(--text2);font-size:13px">${esc(unit)}</small> <span class="x" onclick="closeMatDetail()">×</span></h3>
     <div class="inv-summary">
       <div class="muted" style="font-size:12px">結存合計</div>
@@ -1205,7 +1241,7 @@ function saveTx(name, type){
   const spec=(document.getElementById('txSpec').value||'').trim();
   const qty=parseFloat(document.getElementById('txQty').value)||0;
   if(!qty) return toast('請輸入數量');
-  matTxStore().push({id:uid(), date, type, item:name, spec, qty});
+  matTxStore().push({id:uid(), date, ts:Date.now(), type, item:name, spec, qty});
   view.selDate=date; saveState(); openMatDetail(name); toast('已記'+txLabel(type));
 }
 function delTx(id, name){ if(!confirm('刪除此筆紀錄？'))return; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.id!==id); saveState(); openMatDetail(name); }
@@ -1239,6 +1275,7 @@ function matTxStore(){ if(!state.matTx)state.matTx={}; const sid=state.activeSit
 function itemTxs(name){ return matTxStore().filter(t=>t.item===name); }
 function itemBalance(name){ return itemTxs(name).reduce((b,t)=>b+(t.type==='in'?(+t.qty||0):-(+t.qty||0)),0); }
 function txLabel(t){ return {in:'進料',out:'已用',ret:'退料'}[t]||t; }
+function txTime(ts){ const d=new Date(ts); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 function renderMatSummary(){
   const cats=catalogStore();
   let html='';
