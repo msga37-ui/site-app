@@ -1435,18 +1435,29 @@ function openLaborForm(id){
   const editing=id?laborStore().find(l=>l.id===id):null;
   _labor = editing
     ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||LABOR_TRADES[0], source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', oldPhotoId:editing.photoId||null, editId:id }
-    : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:LABOR_TRADES[0], source:'', count:'', reason:'', oldPhotoId:null, editId:null };
+    : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:(tradeList()[0]||''), source:'', count:'', reason:'', oldPhotoId:null, editId:null };
   _laborPhoto = (editing&&editing.photoId)?{id:editing.photoId, existing:true}:null;
   showLaborModal();
   if(editing&&editing.photoId){ (async()=>{ try{ const rec=await photoGet(editing.photoId); if(rec&&rec.blob){ _laborPhoto={id:editing.photoId,url:URL.createObjectURL(rec.blob),existing:true}; renderLaborPhoto(); } }catch(e){} })(); }
 }
+function tradeList(){ if(!state.laborTrades) state.laborTrades=LABOR_TRADES.slice(); return state.laborTrades; }
+function openTradeManage(){
+  const list=tradeList();
+  openModal(`<h3>管理工種 <span class="x" onclick="showLaborModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">點工的工種清單（所有案場共用）。</div>
+    ${list.map((t,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(t)}</div><button class="del" onclick="delTrade(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無工種</div>'}
+    <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="tradeNew" placeholder="新增工種名稱"><button class="btn" onclick="addTrade()">新增</button></div>
+    <button class="btn ghost full" style="margin-top:14px" onclick="showLaborModal()">完成</button>`);
+}
+function addTrade(){ const n=(document.getElementById('tradeNew').value||'').trim(); if(!n)return toast('請輸入名稱'); const list=tradeList(); if(!list.includes(n))list.push(n); _labor.trade=n; saveState(); openTradeManage(); }
+function delTrade(i){ tradeList().splice(i,1); saveState(); openTradeManage(); }
 function showLaborModal(){
-  const tradeOpts=LABOR_TRADES.map(t=>`<option${t===_labor.trade?' selected':''}>${esc(t)}</option>`).join('');
+  const tradeOpts=tradeList().map(t=>`<option${t===_labor.trade?' selected':''}>${esc(t)}</option>`).join('');
   const siteChips=state.sites.map(s=>`<button type="button" class="site-chip sm${s.id===_labor.siteId?' on':''}" onclick="_labor.siteId='${s.id}';showLaborModal()">${esc(s.name)}</button>`).join('');
   openModal(`<h3>${_labor.editId?'編輯':'新增'}點工 <span class="x" onclick="closeModal()">×</span></h3>
     <label class="fld"><span>案場</span></label><div class="form-site-chips">${siteChips}</div>
     <label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_labor.date)}" onchange="_labor.date=this.value"></label>
-    <label class="fld"><span>工種</span><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select></label>
+    <label class="fld"><span>工種</span><div style="display:flex;gap:8px"><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select><button class="icon-btn" onclick="openTradeManage()" title="管理工種">⚙</button></div></label>
     <div class="row">
       <label class="fld"><span>來源/廠商</span><input class="inp" value="${esc(_labor.source)}" onchange="_labor.source=this.value" placeholder="例：阿明臨時工"></label>
       <label class="fld"><span>人數</span><input class="inp" type="number" inputmode="numeric" value="${_labor.count}" onchange="_labor.count=(this.value===''?'':+this.value)" placeholder="名"></label>
