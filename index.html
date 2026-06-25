@@ -305,7 +305,7 @@ textarea.inp{resize:vertical; min-height:60px}
 #reportOverlay.show{display:flex}
 .rpt-toolbar{position:sticky; top:0; display:flex; gap:10px; justify-content:center; padding:12px; padding-top:calc(12px + env(safe-area-inset-top,0px)); background:var(--bar); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); z-index:2}
 .rpt-pages{padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px}
-.rpt-page{background:#fff; color:#111; width:100%; max-width:760px; padding:22px 24px; box-shadow:0 1px 6px rgba(0,0,0,.15); border-radius:4px}
+.rpt-page{background:#fff; color:#111; width:760px; padding:24px 26px; box-shadow:0 1px 6px rgba(0,0,0,.15); border-radius:4px}
 .rpt-head{margin-bottom:12px}
 .rpt-title{font-size:21px; font-weight:800; text-align:center; letter-spacing:2px}
 .rpt-meta{display:flex; justify-content:space-between; gap:16px; font-size:13px; margin-top:8px; padding-bottom:8px; border-bottom:1.5px solid #333}
@@ -324,7 +324,7 @@ textarea.inp{resize:vertical; min-height:60px}
   body > *:not(#reportOverlay){ display:none !important; }
   #reportOverlay{ position:static; display:block !important; background:#fff; overflow:visible }
   .rpt-toolbar{ display:none !important; }
-  .rpt-pages{ padding:0; gap:0 }
+  .rpt-pages{ padding:0; gap:0; zoom:1 !important }
   .rpt-page{ max-width:none; width:auto; box-shadow:none; border-radius:0; padding:0; page-break-after:always }
   .rpt-page:last-child{ page-break-after:auto }
   .rpt-img{ height:6.3cm }
@@ -1339,10 +1339,10 @@ async function openReportPreview(){
   const ov=document.getElementById('reportOverlay');
   ov.innerHTML=`<div class="rpt-toolbar">
       <button class="btn green" onclick="exportReportPDF()">📤 轉 PDF 傳 LINE</button>
-      <button class="btn ghost" onclick="window.print()">🖨 列印</button>
       <button class="btn gray" onclick="closeReport()">關閉</button>
     </div><div class="rpt-pages">${pages}</div>`;
   ov.classList.add('show');
+  const pagesEl=ov.querySelector('.rpt-pages'); if(pagesEl) pagesEl.style.zoom=Math.min(1,(window.innerWidth-24)/760);
 }
 function closeReport(){ document.getElementById('reportOverlay').classList.remove('show'); }
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
@@ -1353,7 +1353,9 @@ async function ensurePdfLibs(){
 async function exportReportPDF(){
   toast('正在產生 PDF…');
   try{ await ensurePdfLibs(); }catch(e){ toast('沒有網路，改用「列印」另存 PDF'); return; }
+  const pagesEl=document.querySelector('#reportOverlay .rpt-pages'); const oldZoom=pagesEl?pagesEl.style.zoom:'';
   try{
+    if(pagesEl) pagesEl.style.zoom='1';
     const { jsPDF }=window.jspdf;
     const pdf=new jsPDF('p','mm','a4');
     const pages=[...document.querySelectorAll('#reportOverlay .rpt-page')];
@@ -1364,6 +1366,7 @@ async function exportReportPDF(){
       if(i>0) pdf.addPage();
       pdf.addImage(img,'JPEG',(210-w)/2,0,w,h);
     }
+    if(pagesEl) pagesEl.style.zoom=oldZoom;
     const blob=pdf.output('blob');
     const file=new File([blob], `照片紀錄表_${todayStr()}.pdf`, {type:'application/pdf'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -1371,7 +1374,7 @@ async function exportReportPDF(){
     }
     const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
     toast('已產生 PDF（此裝置不支援直接分享，已下載）');
-  }catch(e){ toast('產生 PDF 失敗，可改用「列印」'); }
+  }catch(e){ if(pagesEl) pagesEl.style.zoom=oldZoom; toast('產生 PDF 失敗，請再試一次'); }
 }
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
