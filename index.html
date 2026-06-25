@@ -317,7 +317,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .rpt-tbl{flex:1; border-collapse:collapse; font-size:13px}
 .rpt-tbl th,.rpt-tbl td{border:1px solid #ddd; padding:8px 10px; text-align:left; vertical-align:top}
 .rpt-tbl th{background:#fff; width:54px; white-space:nowrap; font-weight:700; color:#444}
-.rpt-tbl tr:last-child td,.rpt-tbl tr:last-child th{height:46px}
+.rpt-desc{height:5.4em; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical}
 .rpt-img{min-height:150px}
 
 @media print{
@@ -899,7 +899,7 @@ function renderLogPhotoStrip(){
     ? _logPhotos.map((p,i)=>`<div class="thumb"><img src="${p.url}"><button class="thumb-x" onclick="removeLogPhoto(${i})">×</button></div>`).join('')
     : '<span class="muted">尚無照片</span>';
 }
-function addLogPhotos(files){ [...files].forEach(f=>{ _logPhotos.push({id:uid(), blob:f, url:URL.createObjectURL(f)}); }); renderLogPhotoStrip(); }
+async function addLogPhotos(files){ for(const f of [...files]){ const blob=await normalizeImage(f); _logPhotos.push({id:uid(), blob, url:URL.createObjectURL(blob)}); } renderLogPhotoStrip(); }
 function removeLogPhoto(i){ const p=_logPhotos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _logPhotos.splice(i,1); renderLogPhotoStrip(); }
 
 async function saveEntry(){
@@ -1312,7 +1312,18 @@ async function loadPhotoThumb(r){
 function setPhotoField(id,f,v){ const r=photoRecStore().find(x=>x.id===id); if(r){ r[f]=(typeof v==='string'?v.trim():v); saveState(); } }
 function movePhotoRec(id,dir){ const arr=photoRecStore(); const i=arr.findIndex(x=>x.id===id); const j=i+dir; if(j<0||j>=arr.length)return; [arr[i],arr[j]]=[arr[j],arr[i]]; saveState(); renderPhotoRecs(); }
 function addPhotoRec(){ photoRecStore().push({id:uid(),item:'',date:todayStr(),location:'',desc:'',photoId:null}); saveState(); renderPhotoRecs(); }
-async function setPhotoForRec(id,files){ const f=files&&files[0]; if(!f)return; const r=photoRecStore().find(x=>x.id===id); if(!r)return; const pid=uid(); try{ await photoPut(pid,f,{date:r.date}); }catch(e){} if(r.photoId)photoDel(r.photoId).catch(()=>{}); r.photoId=pid; saveState(); renderPhotoRecs(); }
+async function normalizeImage(file){
+  try{
+    const bmp=await createImageBitmap(file, {imageOrientation:'from-image'});
+    let w=bmp.width, h=bmp.height; const max=1600;
+    if(Math.max(w,h)>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(bmp,0,0,w,h); if(bmp.close)bmp.close();
+    const blob=await new Promise(res=>c.toBlob(b=>res(b),'image/jpeg',0.85));
+    return blob||file;
+  }catch(e){ return file; }
+}
+async function setPhotoForRec(id,files){ const f=files&&files[0]; if(!f)return; const r=photoRecStore().find(x=>x.id===id); if(!r)return; toast('處理照片中…'); const blob=await normalizeImage(f); const pid=uid(); try{ await photoPut(pid,blob,{date:r.date}); }catch(e){} if(r.photoId)photoDel(r.photoId).catch(()=>{}); r.photoId=pid; saveState(); renderPhotoRecs(); }
 function delPhotoRec(id){ if(!confirm('刪除這張照片？'))return; const r=photoRecStore().find(x=>x.id===id); if(r&&r.photoId)photoDel(r.photoId).catch(()=>{}); state.photoRecs[state.activeSiteId]=photoRecStore().filter(x=>x.id!==id); saveState(); renderPhotoRecs(); }
 async function openReportPreview(){
   const h=reportHead(); const recs=photoRecStore();
@@ -1328,7 +1339,7 @@ async function openReportPreview(){
         <tr><th>項目</th><td>${esc(r.item||'')}</td></tr>
         <tr><th>日期</th><td>${esc(r.date||'')}</td></tr>
         <tr><th>位置</th><td>${esc(r.location||'')}</td></tr>
-        <tr><th>說明</th><td>${esc(r.desc||'')}</td></tr>
+        <tr><th>說明</th><td><div class="rpt-desc">${esc(r.desc||'')}</div></td></tr>
       </table>
     </div>`).join('');
     pages+=`<div class="rpt-page">
