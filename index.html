@@ -1337,10 +1337,42 @@ async function openReportPreview(){
     </div>`;
   }
   const ov=document.getElementById('reportOverlay');
-  ov.innerHTML=`<div class="rpt-toolbar"><button class="btn" onclick="window.print()">🖨 列印／存 PDF</button><button class="btn gray" onclick="closeReport()">關閉</button></div><div class="rpt-pages">${pages}</div>`;
+  ov.innerHTML=`<div class="rpt-toolbar">
+      <button class="btn green" onclick="exportReportPDF()">📤 轉 PDF 傳 LINE</button>
+      <button class="btn ghost" onclick="window.print()">🖨 列印</button>
+      <button class="btn gray" onclick="closeReport()">關閉</button>
+    </div><div class="rpt-pages">${pages}</div>`;
   ov.classList.add('show');
 }
 function closeReport(){ document.getElementById('reportOverlay').classList.remove('show'); }
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function ensurePdfLibs(){
+  if(!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  if(!(window.jspdf&&window.jspdf.jsPDF)) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+}
+async function exportReportPDF(){
+  toast('正在產生 PDF…');
+  try{ await ensurePdfLibs(); }catch(e){ toast('沒有網路，改用「列印」另存 PDF'); return; }
+  try{
+    const { jsPDF }=window.jspdf;
+    const pdf=new jsPDF('p','mm','a4');
+    const pages=[...document.querySelectorAll('#reportOverlay .rpt-page')];
+    for(let i=0;i<pages.length;i++){
+      const canvas=await html2canvas(pages[i], {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+      const img=canvas.toDataURL('image/jpeg',0.92);
+      let w=210, h=w*canvas.height/canvas.width; if(h>297){ h=297; w=h*canvas.width/canvas.height; }
+      if(i>0) pdf.addPage();
+      pdf.addImage(img,'JPEG',(210-w)/2,0,w,h);
+    }
+    const blob=pdf.output('blob');
+    const file=new File([blob], `照片紀錄表_${todayStr()}.pdf`, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:'工地照片紀錄表'}); return; }catch(e){ if(e.name==='AbortError')return; }
+    }
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+    toast('已產生 PDF（此裝置不支援直接分享，已下載）');
+  }catch(e){ toast('產生 PDF 失敗，可改用「列印」'); }
+}
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
 function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
