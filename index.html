@@ -143,6 +143,24 @@ textarea.inp{resize:vertical; min-height:60px}
 .mat-row.edit{cursor:default}
 .mat-row .cat-ctl{display:flex; gap:2px; flex:none}
 .cat-ctl .del{font-size:14px; padding:3px 5px}
+/* 庫存明細 / 總覽 */
+.inv-summary{background:var(--inp); border-radius:12px; padding:12px 14px}
+.inv-row{display:flex; justify-content:space-between; gap:8px; padding:5px 0; font-size:13px; border-top:1px solid var(--border)}
+.inv-row:first-child{border-top:none}
+.inv-spec{font-weight:600}
+.inv-nums{color:var(--text2)}
+.inv-nums b{color:var(--blue)}
+.tx-row{display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid var(--border)}
+.tx-tag{font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; flex:none}
+.tx-tag.in{background:rgba(52,199,89,.16); color:#1a8c3a}
+.tx-tag.out{background:rgba(255,149,0,.16); color:#a85d00}
+.tx-info{flex:1; font-size:14px}
+.sum-cat{font-weight:800; font-size:14px; color:var(--text2); margin:14px 2px 4px}
+.sum-row{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
+.sum-name{font-weight:600; font-size:14.5px; flex:1}
+.sum-nums{font-size:13px; color:var(--text2); white-space:nowrap}
+.sum-nums b{color:var(--blue); font-size:15px}
+.sum-nums small{color:var(--text2); margin-left:2px}
 .mat-item{display:flex; align-items:flex-start; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
 .mat-item .nm{font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
 .mat-item .nm small{color:var(--text2); font-weight:500; font-size:12px}
@@ -332,8 +350,9 @@ textarea.inp{resize:vertical; min-height:60px}
 <!-- ============ 材料 ============ -->
 <div class="screen" id="screen-mat">
   <div class="seg" id="matModeSeg" style="margin-bottom:10px">
-    <button class="on" onclick="setMatMode('list')">點收清單</button>
-    <button onclick="setMatMode('orders')">材料訂單</button>
+    <button class="on" onclick="setMatMode('list')">材料清單</button>
+    <button onclick="setMatMode('summary')">總覽</button>
+    <button onclick="setMatMode('orders')">訂單</button>
   </div>
   <div id="matListView">
     <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -345,6 +364,10 @@ textarea.inp{resize:vertical; min-height:60px}
       <div class="mat-nav" id="matNav"></div>
       <div class="mat-list" id="matList"></div>
     </div>
+  </div>
+  <div id="matSummaryView" style="display:none">
+    <div style="font-weight:800;font-size:17px;margin:2px 2px 12px">案場材料總覽（進／用／結存）</div>
+    <div id="matSummaryList"></div>
   </div>
   <div id="matOrdersView" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px">
@@ -474,6 +497,15 @@ function migrateState(s){
   s.materials = s.materials || {};
   // 一次性：把已存在目錄裡的「副資材與耗材」改名為「其他材料」
   if(!s._extraRenamed){ Object.values(s.catalog||{}).forEach(cats=>{ const c=(cats||[]).find(x=>x.name==='副資材與耗材'); if(c)c.name='其他材料'; }); s._extraRenamed=true; }
+  // 一次性：把舊「實際(已收)」轉成「進料」交易
+  s.matTx = s.matTx || {};
+  if(!s._matTxMigrated){
+    Object.keys(s.materials||{}).forEach(sid=>{
+      const m=s.materials[sid]; if(!m||!m.items)return; s.matTx[sid]=s.matTx[sid]||[];
+      Object.entries(m.items).forEach(([name,it])=>{ (it.specs||[]).forEach(sp=>{ const act=+sp.actual||0; if(act>0) s.matTx[sid].push({id:uid(), date:todayStr(), type:'in', item:name, spec:sp.label||'', qty:act}); }); });
+    });
+    s._matTxMigrated=true;
+  }
   // 進度舊格式 {item,floor,percent} → {work,floor,percent,vendor}
   Object.keys(s.progress).forEach(sid=>{
     s.progress[sid]=(s.progress[sid]||[]).map(p=> (p.work!==undefined) ? p
@@ -615,12 +647,21 @@ function renderCalendar(){
 }
 function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDay(); }
 
+function matTxOn(date){ return matTxStore().filter(t=>t.date===date); }
+function matTxGroupCard(type, list){
+  const lines=list.map(t=>{ const unit=getMatDef(t.item).unit||''; return `<div class="rc-line"><b>${esc(t.item)}</b> <span class="muted">${esc(t.spec||'')}</span> <span class="rc-pct">${f2(t.qty)}${esc(unit)}</span></div>`; }).join('');
+  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">${type==='in'?'📦 進料':'📤 已用'}</div><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
+}
 function renderDay(){
   document.getElementById('dayTitle').textContent=`${view.selDate} 記錄`;
-  const recs=recordsOn(view.selDate), atts=attendOn(view.selDate);
+  const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate);
+  const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out');
   const box=document.getElementById('dayLogs');
-  if(!recs.length && !atts.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
-  box.innerHTML = recs.map(recordCard).join('') + atts.map(attendCard).join('');
+  if(!recs.length && !atts.length && !txs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
+  let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
+  if(ins.length) html += matTxGroupCard('in', ins);
+  if(outs.length) html += matTxGroupCard('out', outs);
+  box.innerHTML = html;
   loadCardThumbs(recs);
 }
 function recordCard(r){
@@ -948,8 +989,8 @@ function matPointerInit(){
 function toggleMatEdit(){ view.matEdit=!view.matEdit; const b=document.getElementById('matEditBtn'); if(b){ b.textContent=view.matEdit?'完成':'✎ 編輯'; b.classList.toggle('green',view.matEdit); } renderMat(); }
 function itemOrderedTotal(name){ const it=matStore().items[name]; if(!it)return 0; return f2((it.specs||[]).reduce((t,s)=>t+(+s.ordered||0),0)); }
 function matCleanRow(name){
-  const def=getMatDef(name); const tot=itemOrderedTotal(name);
-  const right = tot ? ('已訂 '+tot+(def.unit||'')) : '<span class="mr-empty">點我點收</span>';
+  const def=getMatDef(name); const has=itemTxs(name).length>0; const bal=f2(itemBalance(name));
+  const right = has ? ('剩 '+bal+(def.unit||'')) : '<span class="mr-empty">記進料/已用</span>';
   return `<div class="mat-row" onclick="openMatDetail('${esc(name)}')">
     <span class="mr-name">${esc(name)}</span>
     <span class="mr-ord">${right}</span>
@@ -992,44 +1033,50 @@ function afterMatChange(){ if(_matDetail) openMatDetail(_matDetail); else render
 function closeMatDetail(){ _matDetail=null; closeModal(); renderMat(); }
 function openMatDetail(name){
   _matDetail=name;
-  const def=getMatDef(name);
-  const grp=matItem(name);
-  const specs=grp.specs||[];
-  const perBox = def.perBox||null;
-  const isBox = perBox && perBox>0;
-  const unit=def.unit||'';
-  const boxCfg = isBox?`<div class="muted" style="margin-bottom:8px">每箱 <input class="inp" style="width:62px;padding:5px;display:inline-block;text-align:center" type="number" inputmode="numeric" value="${perBox}" onchange="setPerBox('${esc(name)}',this.value)"> 支</div>`:'';
-  let rows='';
-  specs.forEach(s=>{
-    const ordered=(s.ordered!=null&&s.ordered!=='')?s.ordered:'';
-    const actual=(s.actual!=null&&s.actual!=='')?s.actual:'';
-    const diff=(ordered!==''&&actual!=='')?(actual-ordered):null;
-    const diffTag=diff!=null?`<span class="diff ${diff===0?'ok':(diff<0?'short':'over')}">${diff===0?'✓符合':(diff<0?'缺'+f2(-diff):'多'+f2(diff))}</span>`:'';
-    const qLabel=isBox?'(箱)':'';
-    const boxHint=isBox?`<div class="box-hint">已訂 ${f2((ordered||0)*perBox)} 支 ／ 實際 ${f2((actual||0)*perBox)} 支</div>`:'';
-    rows+=`<div class="spec-row">
-      <div class="spec-top">
-        <div class="chk sm${s.checked?' on':''}" onclick="toggleSpecChk('${esc(name)}','${s.id}')">${s.checked?'✓':''}</div>
-        <input class="spec-label" value="${esc(s.label||'')}" placeholder="規格(如 ${esc((def.presets&&def.presets[0])||'12mm')})" onchange="setSpec('${esc(name)}','${s.id}','label',this.value)">
-        <button class="del" onclick="delSpec('${esc(name)}','${s.id}')">🗑</button>
-      </div>
-      <div class="spec-q">
-        <label>已訂${qLabel}<input type="number" inputmode="decimal" placeholder="—" value="${ordered}" onchange="setSpec('${esc(name)}','${s.id}','ordered',this.value)"></label>
-        <label>實際${qLabel}<input type="number" inputmode="decimal" placeholder="—" value="${actual}" onchange="setSpec('${esc(name)}','${s.id}','actual',this.value)"></label>
-        ${diffTag}
-      </div>
-      ${boxHint}
-    </div>`;
-  });
-  const chips=(def.presets||[]).map(p=>`<button class="preset-chip" onclick="addSpec('${esc(name)}','${esc(p)}')">＋${esc(p)}</button>`).join('')
-    + `<button class="preset-chip" style="border-style:solid" onclick="addSpec('${esc(name)}','')">＋自訂規格</button>`;
+  const def=getMatDef(name); const unit=def.unit||'';
+  const txs=itemTxs(name);
+  // 各規格 進/用/剩
+  const map={}, order=[];
+  txs.forEach(t=>{ const k=t.spec||'(未分規格)'; if(!(k in map)){map[k]={in:0,out:0};order.push(k);} map[k][t.type==='in'?'in':'out']+=(+t.qty||0); });
+  const specRows = order.length ? order.map(k=>{ const s=map[k]; return `<div class="inv-row"><span class="inv-spec">${esc(k)}</span><span class="inv-nums">進${f2(s.in)}／用${f2(s.out)}／<b>剩${f2(s.in-s.out)}</b></span></div>`; }).join('') : '<div class="muted" style="margin:4px 0">尚無進料/已用紀錄</div>';
+  const totalBal=f2(itemBalance(name));
+  const sorted=txs.slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
+  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${t.type==='in'?'進料':'已用'}</span><span class="tx-info">${esc(t.date)}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
   openModal(`<h3>${esc(name)} <small style="color:var(--text2);font-size:13px">${esc(unit)}</small> <span class="x" onclick="closeMatDetail()">×</span></h3>
-    <div class="muted" style="margin-bottom:10px">分規格填「已訂／實際」做點收對帳。</div>
-    ${boxCfg}
-    ${rows||'<div class="muted" style="margin:6px 0">尚無規格，點下方新增。</div>'}
-    <div class="presets" style="margin-top:10px">${chips}</div>
-    <button class="btn full" style="margin-top:14px" onclick="closeMatDetail()">完成</button>`);
+    <div class="inv-summary">
+      <div class="muted" style="font-size:12px">結存合計</div>
+      <div style="font-size:24px;font-weight:800;color:var(--blue)">${totalBal} <small style="font-size:14px;color:var(--text2)">${esc(unit)}</small></div>
+      <div style="margin-top:8px">${specRows}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin:14px 0">
+      <button class="btn full green" onclick="openTxForm('${esc(name)}','in')">＋ 進料</button>
+      <button class="btn full" onclick="openTxForm('${esc(name)}','out')">＋ 已用</button>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin:6px 2px 4px">進出紀錄</div>
+    ${txList}
+    <button class="btn ghost full" style="margin-top:14px" onclick="closeMatDetail()">完成</button>`);
 }
+function openTxForm(name, type){
+  const def=getMatDef(name);
+  const presets=(def.presets||[]);
+  const chips=presets.map(p=>`<button type="button" class="preset-chip" onclick="document.getElementById('txSpec').value='${esc(p)}'">${esc(p)}</button>`).join('');
+  openModal(`<h3>${type==='in'?'＋ 進料':'＋ 已用'} — ${esc(name)} <span class="x" onclick="openMatDetail('${esc(name)}')">×</span></h3>
+    <label class="fld"><span>日期</span><input class="inp" type="date" id="txDate" value="${todayStr()}"></label>
+    <label class="fld"><span>規格（可留空）</span><input class="inp" id="txSpec" placeholder="例：9mm"></label>
+    ${presets.length?`<div class="presets" style="margin:-4px 0 10px">${chips}</div>`:''}
+    <label class="fld"><span>數量（${esc(def.unit||'')}）</span><input class="inp" id="txQty" type="number" inputmode="decimal" placeholder="例：300"></label>
+    <button class="btn full${type==='in'?' green':''}" onclick="saveTx('${esc(name)}','${type}')">儲存${type==='in'?'進料':'已用'}</button>`);
+  setTimeout(()=>{ const el=document.getElementById('txQty'); if(el)el.focus(); },80);
+}
+function saveTx(name, type){
+  const date=document.getElementById('txDate').value||todayStr();
+  const spec=(document.getElementById('txSpec').value||'').trim();
+  const qty=parseFloat(document.getElementById('txQty').value)||0;
+  if(!qty) return toast('請輸入數量');
+  matTxStore().push({id:uid(), date, type, item:name, spec, qty});
+  view.selDate=date; saveState(); openMatDetail(name); toast(type==='in'?'已記進料':'已記已用');
+}
+function delTx(id, name){ if(!confirm('刪除此筆紀錄？'))return; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.id!==id); saveState(); openMatDetail(name); }
 function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); afterMatChange(); }
 function delSpec(name,sid){ const it=matStore().items[name]; if(!it)return; it.specs=it.specs.filter(s=>s.id!==sid); saveState(); afterMatChange(); }
 function setSpec(name,sid,field,v){
@@ -1046,10 +1093,37 @@ function ordStore(){ if(!state.orders)state.orders={}; const sid=state.activeSit
 function allItemNames(){ const names=[]; catalogStore().forEach(c=>c.items.forEach(it=>names.push(it.name))); return [...new Set(names)]; }
 function setMatMode(m){
   view.matMode=m;
-  document.getElementById('matListView').style.display = m==='orders'?'none':'block';
+  document.getElementById('matListView').style.display = m==='list'?'block':'none';
+  document.getElementById('matSummaryView').style.display = m==='summary'?'block':'none';
   document.getElementById('matOrdersView').style.display = m==='orders'?'block':'none';
-  const segs=document.querySelectorAll('#matModeSeg button'); if(segs[0])segs[0].classList.toggle('on',m!=='orders'); if(segs[1])segs[1].classList.toggle('on',m==='orders');
-  if(m==='orders') renderOrders(); else renderMat();
+  const segs=document.querySelectorAll('#matModeSeg button');
+  if(segs[0])segs[0].classList.toggle('on',m==='list');
+  if(segs[1])segs[1].classList.toggle('on',m==='summary');
+  if(segs[2])segs[2].classList.toggle('on',m==='orders');
+  if(m==='orders') renderOrders(); else if(m==='summary') renderMatSummary(); else renderMat();
+}
+/* ===== 材料庫存（進料/已用/結存）===== */
+function matTxStore(){ if(!state.matTx)state.matTx={}; const sid=state.activeSiteId; if(!state.matTx[sid])state.matTx[sid]=[]; return state.matTx[sid]; }
+function itemTxs(name){ return matTxStore().filter(t=>t.item===name); }
+function itemBalance(name){ return itemTxs(name).reduce((b,t)=>b+(t.type==='in'?(+t.qty||0):-(+t.qty||0)),0); }
+function renderMatSummary(){
+  const cats=catalogStore();
+  let html='';
+  cats.forEach(c=>{
+    let rows='';
+    c.items.forEach(it=>{
+      const txs=itemTxs(it.name); if(!txs.length) return;
+      const inSum=f2(txs.filter(t=>t.type==='in').reduce((a,t)=>a+(+t.qty||0),0));
+      const outSum=f2(txs.filter(t=>t.type==='out').reduce((a,t)=>a+(+t.qty||0),0));
+      const bal=f2(inSum-outSum); const unit=getMatDef(it.name).unit||'';
+      rows+=`<div class="sum-row" onclick="openMatDetail('${esc(it.name)}')">
+        <span class="sum-name">${esc(it.name)}</span>
+        <span class="sum-nums">進${inSum} 用${outSum} <b>剩${bal}</b><small>${esc(unit)}</small></span>
+      </div>`;
+    });
+    if(rows) html+=`<div class="sum-cat">${esc(c.name)}</div>${rows}`;
+  });
+  document.getElementById('matSummaryList').innerHTML=html||`<div class="empty">還沒有進料/已用紀錄<br>到「材料清單」點品項，記一筆進料開始</div>`;
 }
 let _order=null;
 function openOrderForm(id){
@@ -1078,8 +1152,7 @@ function showOrderModal(){
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:8px 2px 4px">品項</div>
     <div id="ordLines">${lines}</div>
     <button class="btn ghost sm full" style="margin:4px 0 12px" onclick="ordAddLine()">＋ 品項</button>
-    <label class="fld"><span>備註</span><textarea class="inp" onchange="_order.note=this.value" placeholder="補充…">${esc(_order.note)}</textarea></label>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;font-weight:600"><input type="checkbox" id="ordSync" checked style="width:18px;height:18px"> 下單數量自動帶入「已訂」</label>
+    <label class="fld" style="margin-bottom:14px"><span>備註</span><textarea class="inp" onchange="_order.note=this.value" placeholder="補充…">${esc(_order.note)}</textarea></label>
     <button class="btn full" onclick="saveOrder()">儲存訂單</button>`);
 }
 function ordAddLine(){ _order.lines.push({name:'',spec:'',qty:'',unit:''}); showOrderModal(); }
@@ -1088,22 +1161,16 @@ function saveOrder(){
   const lines=_order.lines.filter(l=>l.name);
   if(!lines.length) return toast('請至少加一個品項');
   lines.forEach(l=>{ if(!l.unit) l.unit=getMatDef(l.name).unit||''; });
-  const sync=document.getElementById('ordSync').checked;
   const o={id:_order.id, date:_order.date||todayStr(), location:_order.location||'', note:_order.note||'', lines};
   const store=ordStore();
   const idx=_order.editId?store.findIndex(x=>x.id===_order.editId):-1;
   if(idx>=0) store[idx]=o; else store.push(o);
-  if(sync){
-    lines.forEach(l=>{ const qty=+l.qty||0; if(!qty)return; const it=matItem(l.name);
-      let sp=it.specs.find(s=>(s.label||'')===(l.spec||'')); if(!sp){ sp={id:uid(),label:l.spec||'',ordered:0,actual:'',checked:false}; it.specs.push(sp); }
-      sp.ordered=(+sp.ordered||0)+qty; });
-  }
-  saveState(); closeModal(); setMatMode('orders'); toast(sync?'訂單已存，數量已帶入已訂':'訂單已儲存');
+  saveState(); closeModal(); setMatMode('orders'); toast('訂單已儲存');
 }
 function renderOrders(){
   const list=ordStore();
   const box=document.getElementById('ordersList');
-  if(!list.length){ box.innerHTML=`<div class="empty">還沒有材料訂單<br>點「＋ 新增訂單」或在點收清單按「🛒 下單」</div>`; return; }
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有材料訂單<br>點「＋ 新增訂單」或在材料清單按「🛒」</div>`; return; }
   box.innerHTML=list.slice().reverse().map(o=>{
     const lines=o.lines.map(l=>`<div class="rc-line"><b>${esc(l.name)}</b> <span class="muted">${esc(l.spec||'')}</span> <span class="rc-pct">${esc(String(l.qty))}${esc(l.unit||'')}</span></div>`).join('');
     return `<div class="log-card">
