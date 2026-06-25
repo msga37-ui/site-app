@@ -20,7 +20,7 @@ body.dark{
   --inp:#2c2c2e; --shadow:0 1px 3px rgba(0,0,0,.5); --bar:rgba(28,28,30,.9);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0; overflow-x:hidden; overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
   background:var(--bg); color:var(--text); font-size:15px; line-height:1.4;
@@ -366,8 +366,7 @@ textarea.inp{resize:vertical; min-height:60px}
     <div class="logo">泰郡<small>工務系統</small></div>
     <div style="display:flex;gap:6px">
       <button class="icon-btn report-btn" onclick="openQuickReport()" title="現場阻礙">🚧</button>
-      <button class="icon-btn" onclick="addSite()" title="新增案場">＋</button>
-      <button class="icon-btn" onclick="renameSite()" title="重命名">✎</button>
+      <button class="icon-btn" onclick="openSiteManage()" title="管理案場">🏢</button>
       <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
     </div>
   </div>
@@ -693,6 +692,38 @@ function delSite(){
   ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
   state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
   state.activeSiteId=state.sites[0].id; saveState(); closeModal(); renderAll();
+}
+/* 管理案場（新增／改名／刪除 合一） */
+function openSiteManage(){
+  openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">可新增、改名或刪除案場。</div>
+    ${state.sites.map(s=>`<div class="mat-item" style="align-items:center">
+      <div class="nm" style="flex:1">${esc(s.name)}${s.id===state.activeSiteId?' <small>（目前）</small>':''}</div>
+      <button class="del" onclick="renameSitePrompt('${s.id}')">✎</button>
+      <button class="del" onclick="delSiteById('${s.id}')">🗑</button>
+    </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="smNew" placeholder="新增案場名稱"><button class="btn" onclick="addSiteQuick()">新增</button></div>
+    <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+}
+function addSiteQuick(){
+  const n=(document.getElementById('smNew').value||'').trim(); if(!n) return toast('請輸入名稱');
+  const id=uid(); state.sites.push({id,name:n}); state.activeSiteId=id; saveState(); renderAll(); openSiteManage();
+}
+function renameSitePrompt(id){
+  const s=state.sites.find(x=>x.id===id); if(!s) return;
+  const n=(prompt('案場改名：',s.name)||'').trim(); if(!n||n===s.name) return;
+  s.name=n; saveState(); renderAll(); openSiteManage();
+}
+function delSiteById(id){
+  if(state.sites.length<=1) return toast('至少需保留一個案場');
+  const s=state.sites.find(x=>x.id===id);
+  if(!confirm('確定刪除「'+(s?s.name:'')+'」？該案場的日誌、進度、材料、照片等資料會一併移除，無法復原。')) return;
+  state.sites=state.sites.filter(x=>x.id!==id);
+  delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
+  ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
+  state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
+  if(state.activeSiteId===id) state.activeSiteId=state.sites[0].id;
+  saveState(); renderAll(); openSiteManage();
 }
 
 /* =================== Tab =================== */
