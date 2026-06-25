@@ -299,6 +299,9 @@ textarea.inp{resize:vertical; min-height:60px}
 .pr-frow{display:flex; align-items:center; gap:8px; margin-bottom:7px}
 .pr-frow>span{width:34px; flex:none; font-size:12px; color:var(--text2); font-weight:600}
 .pr-frow .inp{padding:8px 10px; font-size:14px}
+.pr-descrow{align-items:flex-start}
+.pr-descrow>span{margin-top:8px}
+.pr-descrow textarea{min-height:62px; resize:vertical; line-height:1.4}
 
 /* ===== A4 報告 ===== */
 #reportOverlay{position:fixed; inset:0; z-index:300; background:var(--bg); display:none; flex-direction:column; overflow-y:auto}
@@ -311,13 +314,13 @@ textarea.inp{resize:vertical; min-height:60px}
 .rpt-meta{display:flex; justify-content:space-between; gap:16px; font-size:13px; margin-top:8px; padding-bottom:8px; border-bottom:1px solid #ccc}
 .rpt-meta b{font-weight:700; margin-right:6px}
 .rpt-photo{display:flex; align-items:stretch; margin-bottom:12px; page-break-inside:avoid; break-inside:avoid; border:1px solid #ccc}
-.rpt-img{flex:1; min-width:0; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; border-right:1px solid #ccc; padding:6px}
-.rpt-img img{max-width:100%; max-height:215px; object-fit:contain}
+.rpt-img{flex:1; min-width:0; display:flex; align-items:center; justify-content:center; background:#fff; overflow:hidden; border-right:1px solid #ccc; padding:5px}
+.rpt-img img{max-width:100%; max-height:300px; height:auto; object-fit:contain}
 .rpt-noimg{color:#999; font-size:13px}
 .rpt-tbl{flex:1; border-collapse:collapse; font-size:13px}
-.rpt-tbl th,.rpt-tbl td{border:1px solid #ddd; padding:5px 9px; text-align:left; vertical-align:top}
-.rpt-tbl th{background:#fff; width:54px; white-space:nowrap; font-weight:700; color:#444}
-.rpt-desc{height:9.5em; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:7; -webkit-box-orient:vertical}
+.rpt-tbl th,.rpt-tbl td{border:1px solid #ddd; padding:4px 9px; text-align:left; vertical-align:top}
+.rpt-tbl th{background:#fff; width:50px; white-space:nowrap; font-weight:700; color:#444}
+.rpt-desc{line-height:1.4; overflow:hidden; display:-webkit-box; -webkit-line-clamp:10; -webkit-box-orient:vertical}
 .rpt-img{min-height:150px}
 
 @media print{
@@ -327,8 +330,8 @@ textarea.inp{resize:vertical; min-height:60px}
   .rpt-pages{ padding:0; gap:0; zoom:1 !important }
   .rpt-page{ max-width:none; width:auto; box-shadow:none; border-radius:0; padding:0; page-break-after:always }
   .rpt-page:last-child{ page-break-after:auto }
-  .rpt-img{ min-height:6cm; padding:0.3cm }
-  .rpt-img img{ max-height:6.6cm }
+  .rpt-img{ min-height:6cm; padding:0.25cm }
+  .rpt-img img{ max-height:7.6cm }
 }
 @page{ size:A4 portrait; margin:12mm }
 
@@ -1300,7 +1303,7 @@ function photoRecCard(r,i){
         <div class="pr-frow"><span>項目</span><input class="inp" value="${esc(r.item||'')}" onchange="setPhotoField('${r.id}','item',this.value)" placeholder="例：撒水管持壓"></div>
         <div class="pr-frow"><span>日期</span><input class="inp" type="date" value="${esc(r.date||todayStr())}" onchange="setPhotoField('${r.id}','date',this.value)"></div>
         <div class="pr-frow"><span>位置</span><input class="inp" value="${esc(r.location||'')}" onchange="setPhotoField('${r.id}','location',this.value)" placeholder="例：C棟-16F"></div>
-        <div class="pr-frow"><span>說明</span><input class="inp" value="${esc(r.desc||'')}" onchange="setPhotoField('${r.id}','desc',this.value)" placeholder="例：施工中／施工完成"></div>
+        <div class="pr-frow pr-descrow"><span>說明</span><textarea class="inp" rows="3" onchange="setPhotoField('${r.id}','desc',this.value)" placeholder="例：施工中／施工完成">${esc(r.desc||'')}</textarea></div>
       </div>
     </div>
   </div>`;
