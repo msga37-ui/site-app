@@ -457,12 +457,22 @@ textarea.inp{resize:vertical; min-height:60px}
   <div id="photoRecList"></div>
 </div>
 
+<!-- ============ 點工 ============ -->
+<div class="screen" id="screen-labor">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px">
+    <div style="font-weight:800;font-size:17px">點工單</div>
+    <button class="btn sm" onclick="openLaborForm()">＋ 新增</button>
+  </div>
+  <div id="laborList"></div>
+</div>
+
 <!-- 底部 tab -->
 <div class="tabbar">
   <button id="tab-log" class="on" onclick="switchTab('log')"><span class="ic">📅</span>日誌</button>
   <button id="tab-prog" onclick="switchTab('prog')"><span class="ic">📊</span>進度</button>
   <button id="tab-mat" onclick="switchTab('mat')"><span class="ic">📦</span>材料</button>
   <button id="tab-photo" onclick="switchTab('photo')"><span class="ic">📷</span>照片</button>
+  <button id="tab-labor" onclick="switchTab('labor')"><span class="ic">🧰</span>點工</button>
 </div>
 
 <!-- modal 容器 -->
@@ -678,6 +688,7 @@ function delSite(){
   const id=state.activeSiteId;
   state.sites=state.sites.filter(s=>s.id!==id);
   delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
+  ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
   state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
   state.activeSiteId=state.sites[0].id; saveState(); closeModal(); renderAll();
 }
@@ -685,13 +696,14 @@ function delSite(){
 /* =================== Tab =================== */
 function switchTab(t){
   view.tab=t;
-  ['log','prog','mat','photo'].forEach(x=>{
+  ['log','prog','mat','photo','labor'].forEach(x=>{
     document.getElementById('screen-'+x).classList.toggle('active', x===t);
     document.getElementById('tab-'+x).classList.toggle('on', x===t);
   });
   if(t==='mat') setMatMode(view.matMode||'list');
   if(t==='prog') renderProg();
   if(t==='photo') renderPhotoRecs();
+  if(t==='labor') renderLabor();
 }
 
 /* =================== 月曆 =================== */
@@ -736,13 +748,14 @@ function matTxGroupCard(type, list){
 }
 function renderDay(){
   document.getElementById('dayTitle').textContent=`${view.selDate} 記錄`;
-  const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate);
+  const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate), labs=laborOn(view.selDate);
   const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out');
   const box=document.getElementById('dayLogs');
-  if(!recs.length && !atts.length && !txs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
+  if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
   let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
   if(ins.length) html += matTxGroupCard('in', ins);
   if(outs.length) html += matTxGroupCard('out', outs);
+  html += labs.map(laborDayCard).join('');
   box.innerHTML = html;
   loadCardThumbs(recs);
 }
@@ -1390,6 +1403,85 @@ async function exportReportPDF(){
     const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
     toast('已產生 PDF（此裝置不支援直接分享，已下載）');
   }catch(e){ if(pagesEl) pagesEl.style.zoom=oldZoom; toast('產生 PDF 失敗，請再試一次'); }
+}
+
+/* =================== 點工（叫工紀錄） =================== */
+const LABOR_TRADES=['粗工/臨時工','輕隔間師傅','天花板師傅','油漆補土工'];
+function laborStore(){ if(!state.labor)state.labor={}; const sid=state.activeSiteId; if(!state.labor[sid])state.labor[sid]=[]; return state.labor[sid]; }
+function laborOn(date){ return laborStore().filter(l=>l.date===date); }
+function renderLabor(){
+  const list=laborStore().slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
+  const box=document.getElementById('laborList');
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有點工單<br>點右上「＋ 新增」建立叫工紀錄</div>`; return; }
+  box.innerHTML=list.map(laborCard).join('');
+  list.forEach(l=>{ if(l.photoId) loadLaborThumb(l); });
+}
+function laborCard(l){
+  const photoStrip=l.photoId?`<div class="photo-strip" id="lbph-${l.id}"></div>`:'';
+  return `<div class="log-card">
+    <div class="lc-top"><div style="font-weight:700">🧰 ${esc(l.trade||'點工')}${l.count?' ｜ '+esc(String(l.count))+'名':''}</div><button class="btn green sm" onclick="shareLabor('${l.id}')">LINE</button></div>
+    <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 來源：'+esc(l.source):''}</div>
+    ${l.reason?`<div style="margin-top:4px;font-size:14px">${esc(l.reason)}</div>`:''}
+    ${photoStrip}
+    <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openLaborForm('${l.id}')">編輯</button><button class="btn gray sm" onclick="delLabor('${l.id}')">刪除</button></div>
+  </div>`;
+}
+async function loadLaborThumb(l){ try{ const rec=await photoGet(l.photoId); if(rec&&rec.blob){ const el=document.getElementById('lbph-'+l.id); if(el){ const u=URL.createObjectURL(rec.blob); el.innerHTML=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } } }catch(e){} }
+function laborDayCard(l){
+  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">🧰 點工：${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">來源：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
+}
+let _labor=null, _laborPhoto=null;
+function openLaborForm(id){
+  const editing=id?laborStore().find(l=>l.id===id):null;
+  _labor = editing
+    ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||LABOR_TRADES[0], source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', oldPhotoId:editing.photoId||null, editId:id }
+    : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:LABOR_TRADES[0], source:'', count:'', reason:'', oldPhotoId:null, editId:null };
+  _laborPhoto = (editing&&editing.photoId)?{id:editing.photoId, existing:true}:null;
+  showLaborModal();
+  if(editing&&editing.photoId){ (async()=>{ try{ const rec=await photoGet(editing.photoId); if(rec&&rec.blob){ _laborPhoto={id:editing.photoId,url:URL.createObjectURL(rec.blob),existing:true}; renderLaborPhoto(); } }catch(e){} })(); }
+}
+function showLaborModal(){
+  const tradeOpts=LABOR_TRADES.map(t=>`<option${t===_labor.trade?' selected':''}>${esc(t)}</option>`).join('');
+  const siteChips=state.sites.map(s=>`<button type="button" class="site-chip sm${s.id===_labor.siteId?' on':''}" onclick="_labor.siteId='${s.id}';showLaborModal()">${esc(s.name)}</button>`).join('');
+  openModal(`<h3>${_labor.editId?'編輯':'新增'}點工 <span class="x" onclick="closeModal()">×</span></h3>
+    <label class="fld"><span>案場</span></label><div class="form-site-chips">${siteChips}</div>
+    <label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_labor.date)}" onchange="_labor.date=this.value"></label>
+    <label class="fld"><span>工種</span><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select></label>
+    <div class="row">
+      <label class="fld"><span>來源/廠商</span><input class="inp" value="${esc(_labor.source)}" onchange="_labor.source=this.value" placeholder="例：阿明臨時工"></label>
+      <label class="fld"><span>人數</span><input class="inp" type="number" inputmode="numeric" value="${_labor.count}" onchange="_labor.count=(this.value===''?'':+this.value)" placeholder="名"></label>
+    </div>
+    <label class="fld"><span>工作事由</span><textarea class="inp" onchange="_labor.reason=this.value" placeholder="例：A區矽酸鈣板廢料清理運送、3F隔間局部修改代工">${esc(_labor.reason)}</textarea></label>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">照片存證</div>
+    <div class="photo-strip" id="laborPhotoStrip"></div>
+    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" style="display:none" onchange="setLaborPhoto(this.files)"></label>
+    <button class="btn full" onclick="saveLabor()">儲存</button>`);
+  renderLaborPhoto();
+}
+function renderLaborPhoto(){ const el=document.getElementById('laborPhotoStrip'); if(!el)return; el.innerHTML=(_laborPhoto&&_laborPhoto.url)?`<div class="thumb"><img src="${_laborPhoto.url}"></div>`:'<span class="muted">尚無照片</span>'; }
+async function setLaborPhoto(files){ const f=files&&files[0]; if(!f)return; toast('處理照片中…'); const blob=await normalizeImage(f); _laborPhoto={id:uid(), blob, url:URL.createObjectURL(blob)}; renderLaborPhoto(); }
+async function saveLabor(){
+  const target=_labor.siteId||state.activeSiteId;
+  let photoId=_laborPhoto?_laborPhoto.id:null;
+  if(_laborPhoto&&_laborPhoto.blob){ try{ await photoPut(_laborPhoto.id,_laborPhoto.blob,{date:_labor.date}); }catch(e){} }
+  if(_labor.oldPhotoId && _labor.oldPhotoId!==photoId){ photoDel(_labor.oldPhotoId).catch(()=>{}); }
+  if(_labor.editId && _labor.origSiteId && _labor.origSiteId!==target && state.labor[_labor.origSiteId]){ state.labor[_labor.origSiteId]=state.labor[_labor.origSiteId].filter(x=>x.id!==_labor.editId); }
+  state.activeSiteId=target;
+  const rec={ id:_labor.editId||uid(), date:_labor.date||todayStr(), trade:_labor.trade||'', source:_labor.source||'', count:(_labor.count===''?'':(+_labor.count||0)), reason:_labor.reason||'', photoId };
+  const store=laborStore();
+  const idx=_labor.editId?store.findIndex(x=>x.id===_labor.editId):-1;
+  if(idx>=0) store[idx]=rec; else store.push(rec);
+  view.selDate=rec.date; saveState(); closeModal(); renderAll(); switchTab('labor'); toast('點工已儲存');
+}
+function delLabor(id){ if(!confirm('刪除此點工單？'))return; const l=laborStore().find(x=>x.id===id); if(l&&l.photoId)photoDel(l.photoId).catch(()=>{}); state.labor[state.activeSiteId]=laborStore().filter(x=>x.id!==id); saveState(); renderLabor(); renderCalendar(); renderDay(); }
+function laborLineText(l){ return `【點工】${activeSite().name}\n【日期】${l.date}\n【工種】${l.trade||'-'}${l.count?'（'+l.count+'名）':''}\n【來源】${l.source||'-'}\n【工作事由】${l.reason||'-'}`; }
+async function shareLabor(id){
+  const l=laborStore().find(x=>x.id===id); if(!l)return;
+  const txt=laborLineText(l); let files=[];
+  if(l.photoId){ try{ const rec=await photoGet(l.photoId); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; files.push(new File([rec.blob],'labor.'+(t.includes('png')?'png':'jpg'),{type:t})); } }catch(e){} }
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  if(navigator.share){ const payload={text:txt}; if(files.length&&navigator.canShare&&navigator.canShare({files}))payload.files=files; try{ await navigator.share(payload); return; }catch(e){ if(e.name==='AbortError')return; } }
+  toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
 }
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
