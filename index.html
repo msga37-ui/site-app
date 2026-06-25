@@ -306,16 +306,19 @@ textarea.inp{resize:vertical; min-height:60px}
 .rpt-toolbar{position:sticky; top:0; display:flex; gap:10px; justify-content:center; padding:12px; padding-top:calc(12px + env(safe-area-inset-top,0px)); background:var(--bar); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); z-index:2}
 .rpt-pages{padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px}
 .rpt-page{background:#fff; color:#111; width:100%; max-width:760px; padding:22px 24px; box-shadow:0 1px 6px rgba(0,0,0,.15); border-radius:4px}
-.rpt-head{text-align:center; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:14px}
-.rpt-title{font-size:20px; font-weight:800}
-.rpt-sub{font-size:13px; margin-top:4px}
-.rpt-photo{display:flex; gap:14px; align-items:stretch; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid}
-.rpt-img{flex:1.4; min-width:0; border:1px solid #ccc; display:flex; align-items:center; justify-content:center; background:#fafafa; height:200px; overflow:hidden}
+.rpt-head{margin-bottom:12px}
+.rpt-title{font-size:21px; font-weight:800; text-align:center; letter-spacing:2px}
+.rpt-meta{display:flex; justify-content:space-between; gap:16px; font-size:13px; margin-top:8px; padding-bottom:8px; border-bottom:1.5px solid #333}
+.rpt-meta b{font-weight:700; margin-right:6px}
+.rpt-photo{display:flex; align-items:stretch; margin-bottom:12px; page-break-inside:avoid; break-inside:avoid; border:1px solid #888}
+.rpt-img{flex:1.45; min-width:0; display:flex; align-items:center; justify-content:center; background:#f7f7f7; overflow:hidden; border-right:1px solid #888}
 .rpt-img img{width:100%; height:100%; object-fit:contain}
 .rpt-noimg{color:#999; font-size:13px}
 .rpt-tbl{flex:1; border-collapse:collapse; font-size:13px}
-.rpt-tbl th,.rpt-tbl td{border:1px solid #999; padding:6px 8px; text-align:left; vertical-align:top}
-.rpt-tbl th{background:#f0f0f0; width:54px; white-space:nowrap; font-weight:700}
+.rpt-tbl th,.rpt-tbl td{border:1px solid #aaa; padding:7px 9px; text-align:left; vertical-align:top}
+.rpt-tbl th{background:#eee; width:48px; white-space:nowrap; font-weight:700; text-align:center}
+.rpt-tbl tr:last-child td,.rpt-tbl tr:last-child th{height:46px}
+.rpt-img{height:185px}
 
 @media print{
   body > *:not(#reportOverlay){ display:none !important; }
@@ -324,7 +327,7 @@ textarea.inp{resize:vertical; min-height:60px}
   .rpt-pages{ padding:0; gap:0 }
   .rpt-page{ max-width:none; width:auto; box-shadow:none; border-radius:0; padding:0; page-break-after:always }
   .rpt-page:last-child{ page-break-after:auto }
-  .rpt-img{ height:5.5cm }
+  .rpt-img{ height:6.3cm }
 }
 @page{ size:A4 portrait; margin:12mm }
 
@@ -1329,7 +1332,7 @@ async function openReportPreview(){
     </div>`).join('');
     pages+=`<div class="rpt-page">
       <div class="rpt-head"><div class="rpt-title">${esc(h.title||'工地照片紀錄表')}</div>
-        <div class="rpt-sub">工程名稱：${esc(h.project||'—')}　｜　施工廠商：${esc(h.vendor||'—')}</div></div>
+        <div class="rpt-meta"><span><b>工程名稱</b>${esc(h.project||'')}</span><span><b>施工廠商</b>${esc(h.vendor||'')}</span></div></div>
       ${rows}
     </div>`;
   }
