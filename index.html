@@ -284,6 +284,40 @@ textarea.inp{resize:vertical; min-height:60px}
 .bk-warn{color:var(--red); font-weight:700; margin-top:4px}
 .bk-ok{color:#1a8c3a; font-weight:700; margin-top:4px}
 
+/* ===== 照片紀錄 ===== */
+.pr-body{display:flex; gap:12px; align-items:flex-start}
+.pr-thumb{width:84px; height:84px; flex:none; border-radius:10px; overflow:hidden; background:var(--inp); border:1px solid var(--border)}
+.pr-thumb img{width:100%; height:100%; object-fit:cover; display:block}
+.pr-fields{flex:1; min-width:0; font-size:14px}
+
+/* ===== A4 報告 ===== */
+#reportOverlay{position:fixed; inset:0; z-index:300; background:var(--bg); display:none; flex-direction:column; overflow-y:auto}
+#reportOverlay.show{display:flex}
+.rpt-toolbar{position:sticky; top:0; display:flex; gap:10px; justify-content:center; padding:12px; padding-top:calc(12px + env(safe-area-inset-top,0px)); background:var(--bar); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); z-index:2}
+.rpt-pages{padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px}
+.rpt-page{background:#fff; color:#111; width:100%; max-width:760px; padding:22px 24px; box-shadow:0 1px 6px rgba(0,0,0,.15); border-radius:4px}
+.rpt-head{text-align:center; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:14px}
+.rpt-title{font-size:20px; font-weight:800}
+.rpt-sub{font-size:13px; margin-top:4px}
+.rpt-photo{display:flex; gap:14px; align-items:stretch; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid}
+.rpt-img{flex:1.4; min-width:0; border:1px solid #ccc; display:flex; align-items:center; justify-content:center; background:#fafafa; height:200px; overflow:hidden}
+.rpt-img img{width:100%; height:100%; object-fit:contain}
+.rpt-noimg{color:#999; font-size:13px}
+.rpt-tbl{flex:1; border-collapse:collapse; font-size:13px}
+.rpt-tbl th,.rpt-tbl td{border:1px solid #999; padding:6px 8px; text-align:left; vertical-align:top}
+.rpt-tbl th{background:#f0f0f0; width:54px; white-space:nowrap; font-weight:700}
+
+@media print{
+  body > *:not(#reportOverlay){ display:none !important; }
+  #reportOverlay{ position:static; display:block !important; background:#fff; overflow:visible }
+  .rpt-toolbar{ display:none !important; }
+  .rpt-pages{ padding:0; gap:0 }
+  .rpt-page{ max-width:none; width:auto; box-shadow:none; border-radius:0; padding:0; page-break-after:always }
+  .rpt-page:last-child{ page-break-after:auto }
+  .rpt-img{ height:5.5cm }
+}
+@page{ size:A4 portrait; margin:12mm }
+
 /* ===== modal ===== */
 .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; display:none; align-items:flex-end}
 .modal-bg.show{display:flex}
@@ -388,11 +422,30 @@ textarea.inp{resize:vertical; min-height:60px}
   </div>
 </div>
 
+<!-- ============ 照片紀錄 ============ -->
+<div class="screen" id="screen-photo">
+  <div class="card">
+    <h3>工地照片紀錄表</h3>
+    <label class="fld"><span>標題</span><input class="inp" id="rptTitle" placeholder="工地照片紀錄表" onchange="setReportHead('title',this.value)"></label>
+    <label class="fld"><span>工程名稱</span><input class="inp" id="rptProject" placeholder="例：OO大樓新建工程" onchange="setReportHead('project',this.value)"></label>
+    <label class="fld"><span>施工廠商</span><input class="inp" id="rptVendor" placeholder="例：OO營造" onchange="setReportHead('vendor',this.value)"></label>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
+    <div style="font-weight:800;font-size:17px">照片</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost sm" onclick="openReportPreview()">🖨 列印 A4</button>
+      <button class="btn sm" onclick="openPhotoRecForm()">＋ 照片</button>
+    </div>
+  </div>
+  <div id="photoRecList"></div>
+</div>
+
 <!-- 底部 tab -->
 <div class="tabbar">
   <button id="tab-log" class="on" onclick="switchTab('log')"><span class="ic">📅</span>日誌</button>
   <button id="tab-prog" onclick="switchTab('prog')"><span class="ic">📊</span>進度</button>
   <button id="tab-mat" onclick="switchTab('mat')"><span class="ic">📦</span>材料</button>
+  <button id="tab-photo" onclick="switchTab('photo')"><span class="ic">📷</span>照片</button>
 </div>
 
 <!-- modal 容器 -->
@@ -400,6 +453,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div class="modal" id="modalBox"></div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="reportOverlay"></div>
 
 <script>
 /* =================== 常數 =================== */
@@ -614,12 +668,13 @@ function delSite(){
 /* =================== Tab =================== */
 function switchTab(t){
   view.tab=t;
-  ['log','prog','mat'].forEach(x=>{
+  ['log','prog','mat','photo'].forEach(x=>{
     document.getElementById('screen-'+x).classList.toggle('active', x===t);
     document.getElementById('tab-'+x).classList.toggle('on', x===t);
   });
   if(t==='mat') setMatMode(view.matMode||'list');
   if(t==='prog') renderProg();
+  if(t==='photo') renderPhotoRecs();
 }
 
 /* =================== 月曆 =================== */
@@ -1200,6 +1255,92 @@ async function shareOrder(id){
   if(navigator.share){ try{ await navigator.share({text:txt}); return; }catch(e){ if(e.name==='AbortError')return; } }
   toast('已複製，貼到 LINE 群組即可');
 }
+
+/* =================== 工程照片紀錄 ＋ A4 報告 =================== */
+function photoRecStore(){ if(!state.photoRecs)state.photoRecs={}; const sid=state.activeSiteId; if(!state.photoRecs[sid])state.photoRecs[sid]=[]; return state.photoRecs[sid]; }
+function reportHead(){ if(!state.reportHead)state.reportHead={}; const sid=state.activeSiteId; if(!state.reportHead[sid])state.reportHead[sid]={title:'工地照片紀錄表', project:'', vendor:activeSite().name}; return state.reportHead[sid]; }
+function setReportHead(field,v){ reportHead()[field]=v.trim(); saveState(); }
+function renderPhotoRecs(){
+  const h=reportHead();
+  const ti=document.getElementById('rptTitle'), pj=document.getElementById('rptProject'), vd=document.getElementById('rptVendor');
+  if(ti)ti.value=h.title||''; if(pj)pj.value=h.project||''; if(vd)vd.value=h.vendor||'';
+  const recs=photoRecStore();
+  const box=document.getElementById('photoRecList');
+  if(!recs.length){ box.innerHTML=`<div class="empty">還沒有照片<br>點右上「＋ 照片」開始</div>`; return; }
+  box.innerHTML=recs.map(r=>`<div class="log-card">
+    <div class="pr-body">
+      <div class="pr-thumb" id="prthumb-${r.id}"></div>
+      <div class="pr-fields">
+        <div style="font-weight:700">${esc(r.item||'(未填項目)')}</div>
+        <div class="muted">${esc(r.date||'')}${r.location?' ｜ '+esc(r.location):''}</div>
+        ${r.desc?`<div style="margin-top:2px">${esc(r.desc)}</div>`:''}
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button class="btn ghost sm" onclick="openPhotoRecForm('${r.id}')">編輯</button>
+      <button class="btn gray sm" onclick="delPhotoRec('${r.id}')">刪除</button>
+    </div>
+  </div>`).join('');
+  recs.forEach(async r=>{ if(!r.photoId)return; try{ const rec=await photoGet(r.photoId); if(rec&&rec.blob){ const el=document.getElementById('prthumb-'+r.id); if(el){ const u=URL.createObjectURL(rec.blob); el.innerHTML=`<img src="${u}" onclick="viewPhoto('${u}')">`; } } }catch(e){} });
+}
+let _prPhoto=null, _prEditId=null;
+function vtrim(id){ const el=document.getElementById(id); return el?(el.value||'').trim():''; }
+function openPhotoRecForm(id){
+  const editing=id?photoRecStore().find(r=>r.id===id):null;
+  const cur=editing||{item:'',date:todayStr(),location:'',desc:'',photoId:null};
+  _prEditId=id||null; _prPhoto=null;
+  openModal(`<h3>${editing?'編輯':'新增'}照片 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="photo-strip" id="prPhotoStrip"></div>
+    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選照片<input type="file" accept="image/*" capture="environment" style="display:none" onchange="setPrPhoto(this.files)"></label>
+    <label class="fld"><span>項目</span><input class="inp" id="prItem" value="${esc(cur.item)}" placeholder="例：輕隔間封板"></label>
+    <label class="fld"><span>日期</span><input class="inp" type="date" id="prDate" value="${esc(cur.date)}"></label>
+    <label class="fld"><span>位置</span><input class="inp" id="prLoc" value="${esc(cur.location)}" placeholder="例：C棟-16F"></label>
+    <label class="fld"><span>說明</span><input class="inp" id="prDesc" value="${esc(cur.desc)}" placeholder="例：施工中／驗收完成"></label>
+    <button class="btn full" onclick="savePhotoRec()">儲存</button>`);
+  renderPrPhotoStrip();
+  if(editing&&editing.photoId){ (async()=>{ try{ const rec=await photoGet(editing.photoId); if(rec&&rec.blob){ _prPhoto={id:editing.photoId, url:URL.createObjectURL(rec.blob), existing:true}; renderPrPhotoStrip(); } }catch(e){} })(); }
+}
+function setPrPhoto(files){ const f=files&&files[0]; if(!f)return; _prPhoto={id:uid(), blob:f, url:URL.createObjectURL(f)}; renderPrPhotoStrip(); }
+function renderPrPhotoStrip(){ const el=document.getElementById('prPhotoStrip'); if(!el)return; el.innerHTML = (_prPhoto&&_prPhoto.url) ? `<div class="thumb" style="width:110px;height:110px"><img src="${_prPhoto.url}"></div>` : '<span class="muted">尚無照片</span>'; }
+async function savePhotoRec(){
+  const data={ item:vtrim('prItem'), date:document.getElementById('prDate').value||todayStr(), location:vtrim('prLoc'), desc:vtrim('prDesc') };
+  let photoId=null;
+  if(_prPhoto){ photoId=_prPhoto.id; if(_prPhoto.blob){ try{ await photoPut(_prPhoto.id,_prPhoto.blob,{date:data.date}); }catch(e){} } }
+  data.photoId=photoId;
+  const store=photoRecStore();
+  if(_prEditId){ const r=store.find(x=>x.id===_prEditId); const old=r?r.photoId:null; if(r)Object.assign(r,data); if(old && old!==photoId){ photoDel(old).catch(()=>{}); } }
+  else { store.push({id:uid(), ...data}); }
+  saveState(); closeModal(); renderPhotoRecs(); toast('已儲存');
+}
+function delPhotoRec(id){ if(!confirm('刪除此照片紀錄？'))return; const r=photoRecStore().find(x=>x.id===id); if(r&&r.photoId)photoDel(r.photoId).catch(()=>{}); state.photoRecs[state.activeSiteId]=photoRecStore().filter(x=>x.id!==id); saveState(); renderPhotoRecs(); }
+async function openReportPreview(){
+  const h=reportHead(); const recs=photoRecStore();
+  if(!recs.length) return toast('還沒有照片');
+  const urls={};
+  for(const r of recs){ if(r.photoId){ try{ const rec=await photoGet(r.photoId); if(rec&&rec.blob) urls[r.id]=URL.createObjectURL(rec.blob); }catch(e){} } }
+  let pages='';
+  for(let i=0;i<recs.length;i+=3){
+    const group=recs.slice(i,i+3);
+    const rows=group.map(r=>`<div class="rpt-photo">
+      <div class="rpt-img">${urls[r.id]?`<img src="${urls[r.id]}">`:'<div class="rpt-noimg">無照片</div>'}</div>
+      <table class="rpt-tbl">
+        <tr><th>項目</th><td>${esc(r.item||'')}</td></tr>
+        <tr><th>日期</th><td>${esc(r.date||'')}</td></tr>
+        <tr><th>位置</th><td>${esc(r.location||'')}</td></tr>
+        <tr><th>說明</th><td>${esc(r.desc||'')}</td></tr>
+      </table>
+    </div>`).join('');
+    pages+=`<div class="rpt-page">
+      <div class="rpt-head"><div class="rpt-title">${esc(h.title||'工地照片紀錄表')}</div>
+        <div class="rpt-sub">工程名稱：${esc(h.project||'—')}　｜　施工廠商：${esc(h.vendor||'—')}</div></div>
+      ${rows}
+    </div>`;
+  }
+  const ov=document.getElementById('reportOverlay');
+  ov.innerHTML=`<div class="rpt-toolbar"><button class="btn" onclick="window.print()">🖨 列印／存 PDF</button><button class="btn gray" onclick="closeReport()">關閉</button></div><div class="rpt-pages">${pages}</div>`;
+  ov.classList.add('show');
+}
+function closeReport(){ document.getElementById('reportOverlay').classList.remove('show'); }
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
 function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
