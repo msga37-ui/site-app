@@ -392,7 +392,10 @@ textarea.inp{resize:vertical; min-height:60px}
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
     <div style="font-weight:800;font-size:17px" id="dayTitle">當日記錄</div>
-    <button class="btn sm" onclick="newEntry()">＋ 新增</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn green sm" id="dayShareBtn" onclick="shareDay(view.selDate)">📤 LINE</button>
+      <button class="btn sm" onclick="newEntry()">＋ 新增</button>
+    </div>
   </div>
   <div id="dayLogs"></div>
 </div>
@@ -787,7 +790,6 @@ function renderDay(){
   const box=document.getElementById('dayLogs');
   if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
   let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
-  if(!recs.length && (txs.length||labs.length)) html += `<button class="btn green sm full" style="margin-bottom:12px" onclick="shareDay('${view.selDate}')">LINE 分享當天</button>`;
   if(ins.length) html += matTxGroupCard('in', ins);
   if(outs.length) html += matTxGroupCard('out', outs);
   if(rets.length) html += matTxGroupCard('ret', rets);
@@ -803,7 +805,7 @@ function recordCard(r){
   }).join('');
   const photoStrip=(r.photos&&r.photos.length)?`<div class="photo-strip" id="ph-${r.id}"></div>`:'';
   return `<div class="log-card">
-    <div class="lc-top"><div style="font-weight:700">${esc(r.vendor||'未填廠商')}</div><button class="btn green sm" onclick="shareDay('${r.date}')">LINE</button></div>
+    <div class="lc-top"><div style="font-weight:700">${esc(r.vendor||'未填廠商')}</div></div>
     <div class="rc-items">${items||'<span class="muted">未選工項</span>'}</div>
     ${r.note?`<div class="lc-meta">${esc(r.note)}</div>`:''}
     ${photoStrip}
@@ -1015,10 +1017,11 @@ async function shareRecord(id){
   toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
 }
 /* 分享「當天全部」：施工(各廠商)＋點工＋進料/已用/退料 打包成一則 */
-function dayShareText(date){
+function dayShareText(date, reason){
   const recs=recordsOn(date), labs=laborOn(date), txs=matTxOn(date);
   let total=0; recs.forEach(r=>(r.items||[]).forEach(it=>{ total+=(+it.headcount||0); }));
   let out='每日施工日誌\n【案場】'+activeSite().name+'\n【日期】'+date+'\n【總人數】'+total+' 人';
+  if(!recs.length && !labs.length && !txs.length){ out+='\n\n'+(reason?('【狀況】'+reason):'（本日無施工）'); return out; }
   if(recs.length){
     out+='\n\n［施工］';
     recs.forEach(r=>{
@@ -1033,12 +1036,16 @@ function dayShareText(date){
   }
   if(txs.length){
     out+='\n\n［材料異動］';
-    txs.forEach(t=>{ const icon=t.type==='in'?'📦進料':t.type==='out'?'📤已用':'↩️退料'; out+='\n'+icon+' '+t.item+(t.spec?' '+t.spec:'')+' '+f2(t.qty)+(getMatDef(t.item).unit||''); });
+    txs.forEach(t=>{ out+='\n'+txLabel(t.type)+' '+t.item+(t.spec?' '+t.spec:'')+' '+f2(t.qty)+(getMatDef(t.item).unit||''); });
   }
   return out;
 }
 async function shareDay(date){
-  const txt=dayShareText(date);
+  let reason=null;
+  if(!recordsOn(date).length && !laborOn(date).length && !matTxOn(date).length){
+    const r=prompt('本日無施工，輸入停工原因（可留空，例：颱風停工）：',''); if(r===null) return; reason=r.trim();
+  }
+  const txt=dayShareText(date, reason);
   let files=[];
   for(const r of recordsOn(date)){ if(r.photos&&r.photos.length){ for(const pid of r.photos){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; const ext=t.includes('png')?'png':'jpg'; files.push(new File([rec.blob],pid+'.'+ext,{type:t})); } }catch(e){} } } }
   try{ await navigator.clipboard.writeText(txt); }catch(e){}
