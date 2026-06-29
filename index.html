@@ -107,10 +107,10 @@ textarea.inp{resize:vertical; min-height:60px}
 }
 .cal-cell.muted-day{color:var(--border)}
 .cal-cell.today{font-weight:800}
-.cal-cell.today .dnum{background:var(--red); color:#fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center}
-.cal-cell.sel{background:rgba(0,122,255,.12)}
+.cal-cell.today .dnum{color:var(--red); font-weight:800}
+.cal-cell.sel .dnum{background:var(--text); color:var(--card); border-radius:50%; font-weight:700}
 .cal-cell .dnum{width:26px; height:26px; display:flex; align-items:center; justify-content:center}
-.cal-cell .dots{display:flex; gap:3px; margin-top:3px; height:6px}
+.cal-cell .dots{display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; justify-content:center; min-height:6px; max-width:100%}
 .cal-cell .dots i{width:6px; height:6px; border-radius:50%}
 
 /* ===== 日誌卡 ===== */
@@ -387,10 +387,12 @@ textarea.inp{resize:vertical; min-height:60px}
       <button class="icon-btn" onclick="moveMonth(1)">›</button>
     </div>
     <div class="cal-grid" id="calGrid"></div>
-    <div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:11px;color:var(--text2)">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:10px;font-size:11px;color:var(--text2)">
       <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);vertical-align:middle"></i> 隔間</span>
       <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--orange);vertical-align:middle"></i> 天花</span>
       <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);vertical-align:middle"></i> 批土/其他</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8E8E93;vertical-align:middle"></i> 點工</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--purple);vertical-align:middle"></i> 材料</span>
     </div>
   </div>
 
@@ -503,7 +505,7 @@ const ITEM_COLOR = {
   '隔間牆填棉':'blue','隔間牆灌漿':'red','隔間牆批土':'red','暗架天花骨架吊筋':'orange',
   '暗架天花板封板':'orange','暗架天花批土':'red','明架天花板骨架吊筋':'orange','明架天花板鋪設':'orange'
 };
-const COLOR_HEX = {blue:'#007AFF', orange:'#FF9500', red:'#FF3B30'};
+const COLOR_HEX = {blue:'#007AFF', orange:'#FF9500', red:'#FF3B30', gray:'#8E8E93', purple:'#AF52DE'};
 
 // 材料點收：分類 → 品項（unit=計量單位；perBox=每箱支數(箱裝品項)；presets=常見規格快選）
 const MAT_CATS = [
@@ -568,6 +570,7 @@ const BRIGHT_WARN = '⚠️ 提示：明架落料單純置入骨架內即可，�
 function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function weekdayTW(ds){ const p=String(ds).split('-'); const d=new Date(+p[0],(+p[1]||1)-1,+p[2]||1); return '日一二三四五六'[d.getDay()]; }
 
 let state = loadState();
 let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', workCollapsed:{}, floorCollapsed:{},
@@ -727,7 +730,10 @@ function workColor(work){ return ITEM_COLOR[work] || 'blue'; }
 function dayColors(dateStr){
   const set=new Set();
   recordsOn(dateStr).forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p) set.add(workColor(p.work)); }));
-  return ['blue','orange','red'].filter(c=>set.has(c));
+  const out=['blue','orange','red'].filter(c=>set.has(c));
+  if(laborOn(dateStr).length) out.push('gray');
+  if(matTxOn(dateStr).length) out.push('purple');
+  return out;
 }
 function renderCalendar(){
   const y=view.calYear, m=view.calMonth;
@@ -755,7 +761,7 @@ function matTxGroupCard(type, list){
   return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">${type==='in'?'📦 進料':type==='out'?'📤 已用':'↩️ 退料'}</div><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
 }
 function renderDay(){
-  document.getElementById('dayTitle').textContent=`${view.selDate} 記錄`;
+  document.getElementById('dayTitle').textContent=`${view.selDate} (${weekdayTW(view.selDate)}) 記錄`;
   const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate), labs=laborOn(view.selDate);
   const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out'), rets=txs.filter(t=>t.type==='ret');
   const box=document.getElementById('dayLogs');
