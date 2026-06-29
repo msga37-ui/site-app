@@ -255,7 +255,13 @@ textarea.inp{resize:vertical; min-height:60px}
 .thin-bar::after{content:''; position:absolute; inset:0; pointer-events:none;
   background:repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 2px), var(--bg) calc(10% - 2px), var(--bg) 10%)}
 .floor-pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
-.floor-pill{font-size:13px; font-weight:700; padding:7px 13px; border-radius:999px; border:1.5px solid var(--border)}
+.floor-pill{font-size:13px; font-weight:700; padding:7px 13px; border-radius:999px; border:1.5px solid var(--border); cursor:pointer}
+.ph-row{display:flex; align-items:center; gap:10px; padding:5px 2px}
+.ph-date{flex:none; width:46px; font-size:13px; color:var(--text2); font-weight:600}
+.ph-bar{flex:1; height:10px; background:var(--inp); border-radius:6px; overflow:hidden}
+.ph-fill{display:block; height:100%; background:var(--blue); border-radius:6px}
+.ph-fill.full{background:var(--green)}
+.ph-pct{flex:none; width:42px; text-align:right; font-size:13px; font-weight:700}
 .floor-pill.zero{color:var(--text2); background:var(--inp); opacity:.65}
 .floor-pill.active{color:var(--text); background:var(--card); border-color:var(--text2)}
 .floor-pill.done{color:#1a8c3a; background:rgba(52,199,89,.18); border-color:transparent}
@@ -956,7 +962,7 @@ async function saveEntry(){
   const items=valid.map(it=>{
     const p=upsertProgress(it.work, it.floor||'', _rec.vendor);
     p.percent=Math.max(0,Math.min(100,+it.percent||0)); if(_rec.vendor)p.vendor=_rec.vendor;
-    return { progressId:p.id, headcount:(it.headcount===''?0:(+it.headcount||0)) };
+    return { progressId:p.id, headcount:(it.headcount===''?0:(+it.headcount||0)), percent:Math.max(0,Math.min(100,+it.percent||0)) };
   });
   const rec={ id:_rec.editId||uid(), date:_rec.date||todayStr(), vendor:_rec.vendor||'', items, note:_rec.note||'', photos };
   const store=recStore();
@@ -1646,8 +1652,8 @@ function renderProg(){
   const list = view.progFilter ? all.filter(p=>p.work===view.progFilter) : all;
   box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
 }
-function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.floor||'?')} ${v}%</span>`; }
-function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.work)} ${v}%</span>`; }
+function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgHistory('${p.id}')">${esc(p.floor||'?')} ${v}%</span>`; }
+function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgHistory('${p.id}')">${esc(p.work)} ${v}%</span>`; }
 function progSect(name, kind, avg, meta, collapsed, pillsHtml){
   const caret=collapsed?'▶':'▼';
   return `<div class="prog-sect">
@@ -1682,6 +1688,26 @@ function progHtmlByFloor(list){
 }
 function toggleWork(w){ view.workCollapsed[w]=!view.workCollapsed[w]; renderProg(); }
 function toggleFloorC(f){ view.floorCollapsed[f]=!view.floorCollapsed[f]; renderProg(); }
+/* 進度歷程卡（唯讀；歷程由日誌記錄當天%推算） */
+function progHistory(id){
+  const map={};
+  recStore().forEach(r=>{ (r.items||[]).forEach(it=>{ if(it.progressId===id && it.percent!=null) map[r.date]=Math.max(0,Math.min(100,+it.percent||0)); }); });
+  return Object.keys(map).sort((a,b)=> a<b?-1:1).map(d=>({date:d, percent:map[d]}));
+}
+function mdLabel(ds){ const p=String(ds).split('-'); return (+p[1])+'/'+(+p[2]); }
+function openProgHistory(id){
+  const p=progById(id); if(!p)return;
+  const cur=Math.max(0,Math.min(100,+p.percent||0));
+  const hist=progHistory(id);
+  const rows = hist.length
+    ? hist.map(h=>{ const v=Math.max(0,Math.min(100,+h.percent||0)); return `<div class="ph-row"><span class="ph-date">${mdLabel(h.date)}</span><span class="ph-bar"><span class="ph-fill${v>=100?' full':''}" style="width:${v}%"></span></span><span class="ph-pct">${v}%</span></div>`; }).join('')
+    : `<div class="muted" style="margin:6px 0 2px">尚無歷程紀錄；之後在日誌拉滑桿存檔，就會開始累積。</div>`;
+  openModal(`<h3>${esc(p.work)}${p.floor?' — '+esc(p.floor):''} <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:12px">${p.vendor?'廠商：'+esc(p.vendor)+'　':''}目前 <b style="color:var(--blue)">${cur}%</b></div>
+    ${hist.length?'<div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 6px">進度歷程</div>':''}
+    ${rows}
+    <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+}
 
 /* =================== 設定／備份還原 =================== */
 function applyTheme(){
