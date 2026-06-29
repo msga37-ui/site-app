@@ -80,6 +80,9 @@ textarea.inp{resize:vertical; min-height:60px}
 .tbtn{background:none; border:none; padding:6px 10px; font-size:14px; font-weight:700}
 .tbtn.b{color:var(--blue)}
 .tbtn.r{color:var(--red)}
+.bic{width:16px; height:16px; vertical-align:-3px; margin-right:5px; display:inline-block}
+.set-sec{font-size:12px; font-weight:800; color:var(--text2); letter-spacing:.5px; margin:18px 2px 8px}
+.set-sec:first-of-type{margin-top:6px}
 .btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
 .btn.full{width:100%}
 .pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
@@ -165,6 +168,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .tx-tag.in{background:rgba(52,199,89,.16); color:#1a8c3a}
 .tx-tag.out{background:rgba(255,149,0,.16); color:#a85d00}
 .tx-tag.ret{background:rgba(175,82,222,.16); color:#7d3aa8}
+.tx-tag.lab{background:rgba(142,142,147,.2); color:#7c7c82}
 .tx-info{flex:1; font-size:14px}
 .sum-cat{font-weight:800; font-size:14px; color:var(--text2); margin:14px 2px 4px}
 .sum-row{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
@@ -434,7 +438,7 @@ textarea.inp{resize:vertical; min-height:60px}
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <input class="inp" id="matSearch" placeholder="🔍 搜尋材料品項…" oninput="renderMat()" style="flex:1">
       <button class="btn ghost sm" id="matEditBtn" onclick="toggleMatEdit()">✎ 編輯</button>
-      <button class="btn sm" onclick="openOrderForm()">🛒</button>
+      <button class="btn sm" onclick="openOrderForm()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.5l2.2 12.2a1.5 1.5 0 0 0 1.5 1.3h8.8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/></svg></button>
     </div>
     <div class="mat-wrap">
       <div class="mat-nav" id="matNav"></div>
@@ -465,7 +469,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
     <div style="font-weight:800;font-size:17px">照片</div>
     <div style="display:flex;gap:8px">
-      <button class="btn ghost sm" onclick="openReportPreview()">📤 轉PDF傳LINE</button>
+      <button class="btn ghost sm" onclick="openReportPreview()"><svg class="bic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>轉PDF傳LINE</button>
       <button class="btn sm" onclick="addPhotoRec()">＋ 照片</button>
     </div>
   </div>
@@ -513,6 +517,17 @@ const ITEM_COLOR = {
   '暗架天花板封板':'orange','暗架天花批土':'red','明架天花板骨架吊筋':'orange','明架天花板鋪設':'orange'
 };
 const COLOR_HEX = {blue:'#007AFF', orange:'#FF9500', red:'#FF3B30', gray:'#8E8E93', purple:'#AF52DE'};
+const _IC='<svg class="bic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">';
+const ICONS={
+  camera:_IC+'<path d="M3 9a2 2 0 0 1 2-2h2l1.5-2h5L17 7h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>',
+  share:_IC+'<path d="M12 15V3M8 7l4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
+  cart:_IC+'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.5l2.2 12.2a1.5 1.5 0 0 0 1.5 1.3h8.8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/></svg>',
+  doc:_IC+'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  download:_IC+'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
+  upload:_IC+'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg>',
+  moon:_IC+'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  sun:_IC+'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+};
 
 // 材料點收：分類 → 品項（unit=計量單位；perBox=每箱支數(箱裝品項)；presets=常見規格快選）
 const MAT_CATS = [
@@ -765,7 +780,7 @@ function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDay(); }
 function matTxOn(date){ return matTxStore().filter(t=>t.date===date); }
 function matTxGroupCard(type, list){
   const lines=list.map(t=>{ const unit=getMatDef(t.item).unit||''; return `<div class="rc-line"><b>${esc(t.item)}</b> <span class="muted">${esc(t.spec||'')}</span> <span class="rc-pct">${f2(t.qty)}${esc(unit)}</span></div>`; }).join('');
-  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">${type==='in'?'📦 進料':type==='out'?'📤 已用':'↩️ 退料'}</div><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
+  return `<div class="log-card"><div class="lc-top"><span class="tx-tag ${type}">${txLabel(type)}</span><span class="muted" style="font-size:12px">在材料頁編輯</span></div><div class="rc-items">${lines}</div></div>`;
 }
 function renderDay(){
   document.getElementById('dayTitle').textContent=`${view.selDate} (${weekdayTW(view.selDate)}) 記錄`;
@@ -885,7 +900,7 @@ function showRecordModal(){
       <button class="btn ghost sm full" style="margin:4px 0 14px" onclick="recAddItem()">＋ 項目</button>
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">現場照片</div>
       <div class="photo-strip" id="lfPhotos"></div>
-      <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addLogPhotos(this.files);this.value=''"></label>
+      <label class="btn ghost full" style="margin-bottom:12px">${ICONS.camera}拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addLogPhotos(this.files);this.value=''"></label>
       <label class="fld"><span>備註</span><textarea class="inp" onchange="_rec.note=this.value" placeholder="補充說明…">${esc(_rec.note)}</textarea></label>`;
   } else {
     const checks=state.sites.map(s=>`<button type="button" class="opt${_rec.attendSites.includes(s.id)?' on':''}" onclick="toggleAttendSite('${s.id}',this)">${esc(s.name)}</button>`).join('');
@@ -1446,7 +1461,7 @@ async function openReportPreview(){
   }
   const ov=document.getElementById('reportOverlay');
   ov.innerHTML=`<div class="rpt-toolbar">
-      <button class="btn green" onclick="exportReportPDF()">📤 轉PDF傳LINE</button>
+      <button class="btn green" onclick="exportReportPDF()">${ICONS.share}轉PDF傳LINE</button>
       <button class="btn gray" onclick="closeReport()">關閉</button>
     </div><div class="rpt-pages">${pages}</div>`;
   ov.classList.add('show');
@@ -1499,7 +1514,7 @@ function renderLabor(){
 function laborCard(l){
   const photoStrip=lbPhotos(l).length?`<div class="photo-strip" id="lbph-${l.id}"></div>`:'';
   return `<div class="log-card">
-    <div class="lc-top"><div style="font-weight:700">🧰 ${esc(l.trade||'點工')}${l.count?' ｜ '+esc(String(l.count))+'名':''}</div><button class="btn green sm" onclick="shareLabor('${l.id}')">LINE</button></div>
+    <div class="lc-top"><div style="font-weight:700"><span class="tx-tag lab" style="margin-right:6px">點工</span>${esc(l.trade||'點工')}${l.count?' ｜ '+esc(String(l.count))+'名':''}</div><button class="btn green sm" onclick="shareLabor('${l.id}')">LINE</button></div>
     <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 廠商：'+esc(l.source):''}</div>
     ${l.reason?`<div style="margin-top:4px;font-size:14px">${esc(l.reason)}</div>`:''}
     ${photoStrip}
@@ -1508,7 +1523,7 @@ function laborCard(l){
 }
 async function loadLaborThumb(l){ const el=document.getElementById('lbph-'+l.id); if(!el)return; let html=''; for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); html+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){} } el.innerHTML=html; }
 function laborDayCard(l){
-  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">🧰 點工：${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">廠商：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
+  return `<div class="log-card"><div class="lc-top"><div style="font-weight:700"><span class="tx-tag lab" style="margin-right:6px">點工</span>${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">廠商：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
 }
 let _labor=null, _laborPhotos=[], _laborOrigPhotoIds=[];
 function lbPhotos(l){ return l.photoIds || (l.photoId?[l.photoId]:[]); }
@@ -1547,7 +1562,7 @@ function showLaborModal(){
     <label class="fld"><span>工作內容</span><textarea class="inp" onchange="_labor.reason=this.value" placeholder="例：A區矽酸鈣板廢料清理運送、3F隔間局部修改代工">${esc(_labor.reason)}</textarea></label>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">照片存證</div>
     <div class="photo-strip" id="laborPhotoStrip"></div>
-    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addLaborPhotos(this.files);this.value=''"></label>
+    <label class="btn ghost full" style="margin-bottom:12px">${ICONS.camera}拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addLaborPhotos(this.files);this.value=''"></label>
     <button class="btn full" onclick="saveLabor()">儲存</button>`);
   renderLaborPhotos();
 }
@@ -1600,7 +1615,7 @@ function showQuickReport(){
   openModal(`<h3>🚧 現場阻礙 <span class="x" onclick="closeModal()">×</span></h3>
     <div class="muted" style="margin-bottom:10px">現場快拍 → 一鍵打包轉傳給公司內勤（不會存進系統，純轉傳）。</div>
     <div class="photo-strip" id="qrStrip">${photos}</div>
-    <label class="btn ghost full" style="margin-bottom:14px">📷 拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addQrPhotos(this.files);this.value=''"></label>
+    <label class="btn ghost full" style="margin-bottom:14px">${ICONS.camera}拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addQrPhotos(this.files);this.value=''"></label>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">案場</div>
     <div class="form-site-chips">${siteChips}</div>
     <label class="fld"><span>位置</span><input class="inp" value="${esc(_qr.location)}" onchange="_qr.location=this.value" placeholder="例：C棟-16F"></label>
@@ -1745,23 +1760,24 @@ function openSettings(){
   const ymNow=(new Date()).getFullYear()+'-'+String((new Date()).getMonth()+1).padStart(2,'0');
   const siteOpts=state.sites.map(s=>`<option value="${s.id}"${s.id===state.activeSiteId?' selected':''}>${esc(s.name)}</option>`).join('');
   openModal(`<h3>設定 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="set-row"><span>外觀模式</span><button class="btn ghost sm" onclick="toggleTheme()">${theme==='dark'?'☀️ 切換為淺色':'🌙 切換為深色'}</button></div>
-    <div style="border-top:1px solid var(--border);margin:12px 0"></div>
-    <div class="muted" style="margin-bottom:8px">匯出資料（CSV，可用 Excel 開啟）</div>
+    <div class="set-sec">外觀</div>
+    <div class="set-row"><span>深淺模式</span><button class="btn ghost sm" onclick="toggleTheme()">${theme==='dark'?ICONS.sun+'切換為淺色':ICONS.moon+'切換為深色'}</button></div>
+    <div class="set-sec">匯出資料</div>
+    <div class="muted" style="margin:0 2px 8px;font-size:13px">選案場與月份，匯出成 Excel（CSV）。</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <select class="inp" id="xlSite">${siteOpts}</select>
       <input class="inp" id="xlMonth" type="month" value="${ymNow}" style="max-width:150px">
     </div>
-    <button class="btn full" style="margin-bottom:16px" onclick="exportCSV()">📊 匯出 Excel（CSV）</button>
-    <div style="border-top:1px solid var(--border);margin:0 0 12px"></div>
-    <div class="muted" style="margin-bottom:10px">資料只存在這支手機，建議定期備份到「檔案」或 LINE Keep。</div>
+    <button class="btn full" onclick="exportCSV()">${ICONS.doc}匯出 Excel（CSV）</button>
+    <div class="set-sec">備份還原</div>
+    <div class="muted" style="margin:0 2px 10px;font-size:13px">資料只存在這支手機，建議定期備份到「檔案」或 LINE Keep。</div>
     <div class="bk-times${need?' need':''}">
       <div>最後變動：<b>${fmtTime(ch)}</b></div>
       <div>上次備份：<b>${fmtTime(bk)}</b></div>
       ${need?'<div class="bk-warn">⚠️ 有變動還沒備份，建議現在備份</div>':'<div class="bk-ok">✅ 已是最新備份</div>'}
     </div>
-    <button class="btn full" style="margin:12px 0 10px" onclick="exportBackup()">⬇️ 匯出備份（所有資料＋照片）</button>
-    <label class="btn ghost full" style="margin-bottom:16px">⬆️ 還原備份（選擇備份檔）
+    <button class="btn full" style="margin:12px 0 10px" onclick="exportBackup()">${ICONS.download}匯出備份（所有資料＋照片）</button>
+    <label class="btn ghost full" style="margin-bottom:16px">${ICONS.upload}還原備份（選擇備份檔）
       <input type="file" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
     </label>
     <div class="warn" style="margin-top:0">⚠️ 請<b>不要刪除主畫面圖示</b> —— 刪除會清掉手機上的資料。</div>`);
