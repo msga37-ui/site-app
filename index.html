@@ -76,6 +76,9 @@ textarea.inp{resize:vertical; min-height:60px}
 .btn.green{background:var(--green)}
 .btn.gray{background:var(--inp); color:var(--text2); border:1px solid var(--border)}
 .btn.red{background:rgba(255,59,48,.12); color:var(--red); border:1px solid rgba(255,59,48,.28)}
+.tbtn{background:none; border:none; padding:6px 10px; font-size:14px; font-weight:700}
+.tbtn.b{color:var(--blue)}
+.tbtn.r{color:var(--red)}
 .btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
 .btn.full{width:100%}
 .pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
@@ -808,17 +811,17 @@ function recordCard(r){
     ${r.note?`<div class="lc-meta">${esc(r.note)}</div>`:''}
     ${photoStrip}
     <div style="margin-top:10px;display:flex;gap:8px">
-      <button class="btn ghost sm" onclick="openRecordForm('${r.id}')">✏️ 編輯</button>
-      <button class="btn red sm" onclick="delRecord('${r.id}')">🗑 刪除</button>
+      <button class="tbtn b" onclick="openRecordForm('${r.id}')">編輯</button>
+      <button class="tbtn r" onclick="delRecord('${r.id}')">刪除</button>
     </div>
   </div>`;
 }
 function attendCard(a){
   const names=(a.sites||[]).map(id=>{ const s=state.sites.find(x=>x.id===id); return s?s.name:''; }).filter(Boolean).join('、');
   return `<div class="log-card">
-    <div class="lc-top"><div style="font-weight:700">🧑‍🔧 出勤</div><button class="btn red sm" onclick="delAttend('${a.id}')">🗑 刪除</button></div>
+    <div class="lc-top"><div style="font-weight:700">🧑‍🔧 出勤</div><button class="tbtn r" onclick="delAttend('${a.id}')">刪除</button></div>
     <div class="lc-meta">${esc(names||'—')}</div>
-    <div style="margin-top:8px"><button class="btn ghost sm" onclick="openAttendForm('${a.id}')">✏️ 編輯</button></div>
+    <div style="margin-top:8px"><button class="tbtn b" onclick="openAttendForm('${a.id}')">編輯</button></div>
   </div>`;
 }
 async function loadCardThumbs(recs){
@@ -1366,7 +1369,7 @@ function renderOrders(){
       <div class="lc-top"><div style="font-weight:700">${esc(o.date)} ｜ ${esc(o.location||'-')}</div><button class="btn green sm" onclick="shareOrder('${o.id}')">LINE</button></div>
       <div class="rc-items">${lines}</div>
       ${o.note?`<div class="lc-meta">${esc(o.note)}</div>`:''}
-      <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openOrderForm('${o.id}')">✏️ 編輯</button><button class="btn red sm" onclick="delOrder('${o.id}')">🗑 刪除</button></div>
+      <div style="margin-top:10px;display:flex;gap:8px"><button class="tbtn b" onclick="openOrderForm('${o.id}')">編輯</button><button class="tbtn r" onclick="delOrder('${o.id}')">刪除</button></div>
     </div>`;
   }).join('');
 }
@@ -1517,7 +1520,7 @@ function laborCard(l){
     <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 廠商：'+esc(l.source):''}</div>
     ${l.reason?`<div style="margin-top:4px;font-size:14px">${esc(l.reason)}</div>`:''}
     ${photoStrip}
-    <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openLaborForm('${l.id}')">✏️ 編輯</button><button class="btn red sm" onclick="delLabor('${l.id}')">🗑 刪除</button></div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button class="tbtn b" onclick="openLaborForm('${l.id}')">編輯</button><button class="tbtn r" onclick="delLabor('${l.id}')">刪除</button></div>
   </div>`;
 }
 async function loadLaborThumb(l){ const el=document.getElementById('lbph-'+l.id); if(!el)return; let html=''; for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); html+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){} } el.innerHTML=html; }
