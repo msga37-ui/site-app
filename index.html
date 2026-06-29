@@ -89,6 +89,8 @@ textarea.inp{resize:vertical; min-height:60px}
 .srch-k{flex:none; font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px; background:var(--inp); color:var(--text2)}
 .srch-t{flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .stall{font-size:11px; font-weight:700; color:#a85d00; background:rgba(255,149,0,.16); padding:2px 7px; border-radius:999px; margin-right:6px}
+.logsearch-bar{display:flex; align-items:center; gap:8px; width:100%; padding:11px 14px; border-radius:12px; background:var(--inp); border:1px solid var(--border); color:var(--text2); font-size:14px; font-weight:600; margin-bottom:12px}
+.btn.on-stall{background:rgba(255,149,0,.16); color:#a85d00; border-color:transparent}
 .btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
 .btn.full{width:100%}
 .pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
@@ -397,6 +399,7 @@ textarea.inp{resize:vertical; min-height:60px}
 
 <!-- ============ 日誌 ============ -->
 <div class="screen active" id="screen-log">
+  <button class="logsearch-bar" onclick="openLogSearch()"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-3.5-3.5"/></svg>搜尋日誌…</button>
   <div class="card">
     <div class="cal-head">
       <button class="icon-btn" onclick="moveMonth(-1)">‹</button>
@@ -416,7 +419,6 @@ textarea.inp{resize:vertical; min-height:60px}
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
     <div style="font-weight:800;font-size:17px" id="dayTitle">當日記錄</div>
     <div style="display:flex;gap:6px">
-      <button class="btn ghost sm" onclick="openLogSearch()" aria-label="搜尋"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-3.5-3.5"/></svg></button>
       <button class="btn green sm" id="dayShareBtn" onclick="shareDay(view.selDate)">LINE</button>
       <button class="btn sm" onclick="newEntry()">＋ 新增</button>
     </div>
@@ -429,7 +431,8 @@ textarea.inp{resize:vertical; min-height:60px}
   <div id="progSummary"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 2px 12px;gap:8px">
     <button class="btn ghost sm" id="progViewBtn" onclick="toggleProgView()">依工項</button>
-    <select class="inp" id="progFilter" onchange="setProgFilter(this.value)" style="flex:1;max-width:62%"></select>
+    <button class="btn ghost sm" id="stallBtn" onclick="toggleStallOnly()">停滯</button>
+    <select class="inp" id="progFilter" onchange="setProgFilter(this.value)" style="flex:1;max-width:46%"></select>
   </div>
   <div id="progList"></div>
 </div>
@@ -602,7 +605,7 @@ function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(
 function weekdayTW(ds){ const p=String(ds).split('-'); const d=new Date(+p[0],(+p[1]||1)-1,+p[2]||1); return '日一二三四五六'[d.getDay()]; }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', workCollapsed:{}, floorCollapsed:{},
+let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', progStallOnly:false, workCollapsed:{}, floorCollapsed:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -1686,8 +1689,9 @@ function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(
 function headcountByWork(work){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p&&p.work===work)t+=(+it.headcount||0); })); return Math.round(t*10)/10; }
 function vendorByWork(work){ const set=new Set(); progStore().forEach(p=>{ if(p.work===work&&p.vendor)set.add(p.vendor); }); return [...set].join('、'); }
 function vendorHeadcounts(){ const map={}, order=[]; recStore().forEach(r=>{ const k=r.vendor||'(未填廠商)'; (r.items||[]).forEach(it=>{ if(!(k in map)){map[k]=0;order.push(k);} map[k]+=(+it.headcount||0); }); }); return {map,order}; }
-function toggleProgView(){ view.progView = view.progView==='floor'?'work':'floor'; renderProg(); }
+function toggleProgView(){ view.progView = view.progView==='floor'?'work':'floor'; view.progStallOnly=false; renderProg(); }
 function setProgFilter(v){ view.progFilter=v; renderProg(); }
+function toggleStallOnly(){ view.progStallOnly=!view.progStallOnly; if(view.progStallOnly) view.progView='work'; renderProg(); }
 function floorOrderNum(f){ const m=String(f).match(/^([BR]?)(\d+)/i); if(!m) return 99999; let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; return n; }
 function renderProgSummary(){
   const list=progStore();
@@ -1709,6 +1713,7 @@ function renderProg(){
   const box=document.getElementById('progList');
   const fsel=document.getElementById('progFilter');
   if(fsel){ const works=[...new Set(all.map(p=>p.work).filter(Boolean))]; if(view.progFilter&&!works.includes(view.progFilter))view.progFilter=''; fsel.innerHTML='<option value="">全部工項</option>'+works.map(w=>`<option${w===view.progFilter?' selected':''}>${esc(w)}</option>`).join(''); }
+  const sb=document.getElementById('stallBtn'); if(sb) sb.classList.toggle('on-stall', view.progStallOnly);
   if(!all.length){ box.innerHTML=`<div class="empty">還沒有進度<br>在日誌記一筆、拉一下進度滑桿，這裡就會出現</div>`; return; }
   const list = view.progFilter ? all.filter(p=>p.work===view.progFilter) : all;
   box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
@@ -1729,16 +1734,18 @@ function progSect(name, kind, avg, meta, collapsed, pillsHtml, badgeHtml){
 function progHtmlByWork(list){
   const groups={}, order=[];
   list.forEach(p=>{ if(!groups[p.work]){groups[p.work]=[];order.push(p.work);} groups[p.work].push(p); });
-  return order.map(work=>{
+  const cards=order.map(work=>{
     const g=groups[work]; g.sort((a,b)=>floorOrderNum(a.floor)-floorOrderNum(b.floor));
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
     const hc=headcountByWork(work);
     const meta=[vendorByWork(work), hc?hc+'人':''].filter(Boolean).join(' ');
-    let badge='';
+    let badge='', stalled=false;
     const last=Math.max(0,...g.map(p=>{ const h=progHistory(p.id); return h.length?Date.parse(h[h.length-1].date):0; }));
-    if(last>0 && avg<100){ const days=Math.floor((Date.now()-last)/86400000); if(days>7) badge=`<span class="stall">停滯${days}天</span>`; }
-    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''), badge);
-  }).join('');
+    if(last>0 && avg<100){ const days=Math.floor((Date.now()-last)/86400000); if(days>7){ badge=`<span class="stall">停滯${days}天</span>`; stalled=true; } }
+    return {stalled, html:progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''), badge)};
+  });
+  const shown=view.progStallOnly?cards.filter(c=>c.stalled):cards;
+  return shown.length?shown.map(c=>c.html).join(''):(view.progStallOnly?'<div class="empty" style="padding:30px 12px">目前沒有停滯的工項 👍</div>':'');
 }
 function progHtmlByFloor(list){
   const groups={}, order=[];
@@ -1908,7 +1915,23 @@ function registerSW(){
 
 /* =================== init =================== */
 function renderAll(){ renderSiteChips(); renderCalendar(); renderDay(); renderProg(); renderMat(); renderPhotoRecs(); renderLabor(); }
-function init(){ applyTheme(); setupPWA(); registerSW(); matPointerInit(); renderAll(); }
+function maybeWelcome(){
+  if(localStorage.getItem('wm_welcomed')) return;
+  openModal(`<h3>歡迎使用 泰郡工務系統 👷</h3>
+    <div style="font-size:14px;line-height:1.95">
+      底部五個分頁：<br>
+      ・<b>日誌</b>：每天記施工／出勤，月曆一眼看當月<br>
+      ・<b>進度</b>：各工項到哪了，點膠囊看歷程<br>
+      ・<b>材料</b>：進料／已用／退料、結存、叫貨<br>
+      ・<b>照片</b>：工地照片，可轉 PDF 傳 LINE<br>
+      ・<b>點工</b>：臨時叫工紀錄<br>
+      右上可<b>管理案場</b>、進<b>設定</b>備份。
+    </div>
+    <div class="warn" style="margin-top:12px">⚠️ 資料只存在這支手機，請定期到設定<b>備份</b>；別刪除主畫面圖示。</div>
+    <button class="btn full" style="margin-top:14px" onclick="dismissWelcome()">開始使用</button>`);
+}
+function dismissWelcome(){ localStorage.setItem('wm_welcomed','1'); closeModal(); }
+function init(){ applyTheme(); setupPWA(); registerSW(); matPointerInit(); renderAll(); maybeWelcome(); }
 init();
 </script>
 </body>
