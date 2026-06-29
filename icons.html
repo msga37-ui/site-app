@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>圖示風格比較</title>
+<style>
+:root{--accent:#5856D6;--card:#1c1c1e;--text:#f2f2f7;--text2:#98989f;--inp:#2c2c2e}
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:var(--text);font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;padding:18px 14px 40px}
+h1{font-size:18px;margin:4px 2px 4px}
+.note{color:var(--text2);font-size:13px;margin:0 2px 18px;line-height:1.6}
+.sty{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px}
+.sty .lab{font-weight:800;font-size:15px;margin-bottom:12px}
+.sty .lab small{color:var(--text2);font-weight:600;font-size:12px;margin-left:6px}
+.icons{display:flex;justify-content:space-between;align-items:flex-end;gap:6px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;font-size:11px;color:var(--text2)}
+.cell.on{color:var(--accent)}
+.chip{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center}
+svg{display:block}
+</style>
+</head>
+<body>
+<h1>圖示風格比較</h1>
+<p class="note">同一組底部分頁圖示，用 4 種風格呈現（藍紫色＝選中的「日誌」，其餘＝未選）。挑你喜歡的，把<b>編號</b>告訴我；右上和底部會一起套用。</p>
+<div id="list"></div>
+<script>
+const icons={
+  日誌:'<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 3v3.5M16 3v3.5"/>',
+  進度:'<path d="M4 20h16M7 20v-6M12 20v-11M17 20v-8"/>',
+  材料:'<path d="M21 8.5l-9-5-9 5 9 5 9-5z"/><path d="M3 8.5v7l9 5 9-5v-7M12 13.5v7"/>',
+  照片:'<path d="M3 9a2 2 0 0 1 2-2h2l1.5-2h5L17 7h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/>',
+  點工:'<rect x="3" y="8" width="18" height="11" rx="2"/><path d="M3 13h18M9 8V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5V8"/>',
+};
+const names=Object.keys(icons);
+function svg(inner,sw,color){return `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;}
+const styles=[
+  ['1','細線條','纖細精緻', n=>{const on=n==='日誌';return `<div class="cell ${on?'on':''}">${svg(icons[n],1.3,on?'var(--accent)':'var(--text2)')}${n}</div>`;}],
+  ['2','標準（目前）','平衡', n=>{const on=n==='日誌';return `<div class="cell ${on?'on':''}">${svg(icons[n],1.7,on?'var(--accent)':'var(--text2)')}${n}</div>`;}],
+  ['3','粗圓線條','飽滿好按、戶外清楚', n=>{const on=n==='日誌';return `<div class="cell ${on?'on':''}">${svg(icons[n],2.4,on?'var(--accent)':'var(--text2)')}${n}</div>`;}],
+  ['4','圓底填色','選中放進色塊、最明顯', n=>{const on=n==='日誌';return `<div class="cell ${on?'on':''}"><span class="chip" style="background:${on?'var(--accent)':'transparent'}">${svg(icons[n],1.8,on?'#fff':'var(--text2)')}</span>${n}</div>`;}],
+];
+document.getElementById('list').innerHTML=styles.map(([num,nm,desc,fn])=>`
+  <div class="sty">
+    <div class="lab">${num}. ${nm}<small>${desc}</small></div>
+    <div class="icons">${names.map(fn).join('')}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>
