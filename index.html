@@ -570,7 +570,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progView:'work', progFilter:'', workCollapsed:{}, floorCollapsed:{},
+let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', workCollapsed:{}, floorCollapsed:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -668,36 +668,6 @@ function renderSiteChips(){
   el.innerHTML=state.sites.map(s=>`<button class="site-chip${s.id===state.activeSiteId?' on':''}" onclick="switchSite('${s.id}')">${esc(s.name)}</button>`).join('');
 }
 function switchSite(id){ state.activeSiteId=id; saveState(); renderAll(); }
-function addSite(){
-  openModal(`<h3>新增案場 <span class="x" onclick="closeModal()">×</span></h3>
-    <label class="fld"><span>案場名稱</span><input class="inp" id="newSiteName" placeholder="例：青年安心住宅"></label>
-    <button class="btn full" onclick="doAddSite()">建立</button>`);
-  setTimeout(()=>document.getElementById('newSiteName').focus(),100);
-}
-function doAddSite(){
-  const n=document.getElementById('newSiteName').value.trim(); if(!n) return toast('請輸入名稱');
-  const id=uid(); state.sites.push({id,name:n}); state.activeSiteId=id; saveState(); closeModal(); renderAll();
-}
-function renameSite(){
-  const s=activeSite();
-  openModal(`<h3>重命名案場 <span class="x" onclick="closeModal()">×</span></h3>
-    <label class="fld"><span>案場名稱</span><input class="inp" id="rnSiteName" value="${esc(s.name)}"></label>
-    <div class="row"><button class="btn gray" onclick="delSite()">刪除案場</button><button class="btn" onclick="doRenameSite()">儲存</button></div>`);
-}
-function doRenameSite(){
-  const n=document.getElementById('rnSiteName').value.trim(); if(!n) return toast('請輸入名稱');
-  activeSite().name=n; saveState(); closeModal(); renderAll();
-}
-function delSite(){
-  if(state.sites.length<=1) return toast('至少需保留一個案場');
-  if(!confirm('確定刪除此案場？該案場日誌與材料資料會一併移除。')) return;
-  const id=state.activeSiteId;
-  state.sites=state.sites.filter(s=>s.id!==id);
-  delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
-  ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
-  state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
-  state.activeSiteId=state.sites[0].id; saveState(); closeModal(); renderAll();
-}
 /* 管理案場（新增／改名／刪除 合一） */
 function openSiteManage(){
   openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
@@ -1385,7 +1355,7 @@ async function shareOrder(id){
 
 /* =================== 工程照片紀錄 ＋ A4 報告 =================== */
 function photoRecStore(){ if(!state.photoRecs)state.photoRecs={}; const sid=state.activeSiteId; if(!state.photoRecs[sid])state.photoRecs[sid]=[]; return state.photoRecs[sid]; }
-function reportHead(){ if(!state.reportHead)state.reportHead={}; const sid=state.activeSiteId; if(!state.reportHead[sid])state.reportHead[sid]={title:'工地照片紀錄表', project:activeSite().name, vendor:activeSite().name}; return state.reportHead[sid]; }
+function reportHead(){ if(!state.reportHead)state.reportHead={}; const sid=state.activeSiteId; if(!state.reportHead[sid])state.reportHead[sid]={title:'工地照片紀錄表', project:activeSite().name, vendor:''}; return state.reportHead[sid]; }
 function setReportHead(field,v){ reportHead()[field]=v.trim(); saveState(); }
 function renderPhotoRecs(){
   const h=reportHead();
@@ -1463,7 +1433,7 @@ async function openReportPreview(){
   }
   const ov=document.getElementById('reportOverlay');
   ov.innerHTML=`<div class="rpt-toolbar">
-      <button class="btn green" onclick="exportReportPDF()">📤 轉 PDF 傳 LINE</button>
+      <button class="btn green" onclick="exportReportPDF()">📤 轉PDF傳LINE</button>
       <button class="btn gray" onclick="closeReport()">關閉</button>
     </div><div class="rpt-pages">${pages}</div>`;
   ov.classList.add('show');
@@ -1643,12 +1613,6 @@ function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(
 function headcountByWork(work){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p&&p.work===work)t+=(+it.headcount||0); })); return Math.round(t*10)/10; }
 function vendorByWork(work){ const set=new Set(); progStore().forEach(p=>{ if(p.work===work&&p.vendor)set.add(p.vendor); }); return [...set].join('、'); }
 function vendorHeadcounts(){ const map={}, order=[]; recStore().forEach(r=>{ const k=r.vendor||'(未填廠商)'; (r.items||[]).forEach(it=>{ if(!(k in map)){map[k]=0;order.push(k);} map[k]+=(+it.headcount||0); }); }); return {map,order}; }
-function toggleProgEdit(){
-  view.progEdit=!view.progEdit;
-  const b=document.getElementById('progEditBtn');
-  b.textContent=view.progEdit?'完成':'編輯'; b.classList.toggle('green',view.progEdit);
-  renderProg();
-}
 function toggleProgView(){ view.progView = view.progView==='floor'?'work':'floor'; renderProg(); }
 function setProgFilter(v){ view.progFilter=v; renderProg(); }
 function floorOrderNum(f){ const m=String(f).match(/^([BR]?)(\d+)/i); if(!m) return 99999; let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; return n; }
@@ -1678,13 +1642,12 @@ function renderProg(){
 }
 function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.floor||'?')} ${v}%</span>`; }
 function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.work)} ${v}%</span>`; }
-function progSect(name, kind, avg, meta, collapsed, pillsHtml, delFn){
+function progSect(name, kind, avg, meta, collapsed, pillsHtml){
   const caret=collapsed?'▶':'▼';
-  const del=view.progEdit?` <button class="del" onclick="event.stopPropagation();${delFn}">🗑</button>`:'';
   return `<div class="prog-sect">
     <div class="ps-head" onclick="${kind}">
       <span class="ps-name">${esc(name)}</span>
-      <span class="ps-meta">${meta?esc(meta)+' ':''}<b>${avg}%</b>${del} <span class="ps-caret">${caret}</span></span>
+      <span class="ps-meta">${meta?esc(meta)+' ':''}<b>${avg}%</b> <span class="ps-caret">${caret}</span></span>
     </div>
     <div class="thin-bar"><div class="thin-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
     ${collapsed?'':`<div class="floor-pills">${pillsHtml}</div>`}
@@ -1698,7 +1661,7 @@ function progHtmlByWork(list){
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
     const hc=headcountByWork(work);
     const meta=[vendorByWork(work), hc?hc+'人':''].filter(Boolean).join(' ');
-    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''), `delWorkGroup('${esc(work)}')`);
+    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''));
   }).join('');
 }
 function progHtmlByFloor(list){
@@ -1708,41 +1671,11 @@ function progHtmlByFloor(list){
   return order.map(floor=>{
     const g=groups[floor];
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
-    return progSect(floor, `toggleFloorC('${esc(floor)}')`, avg, '', view.floorCollapsed[floor], g.map(workPill).join(''), `delFloorGroup('${esc(floor)}')`);
+    return progSect(floor, `toggleFloorC('${esc(floor)}')`, avg, '', view.floorCollapsed[floor], g.map(workPill).join(''));
   }).join('');
 }
 function toggleWork(w){ view.workCollapsed[w]=!view.workCollapsed[w]; renderProg(); }
 function toggleFloorC(f){ view.floorCollapsed[f]=!view.floorCollapsed[f]; renderProg(); }
-function delProg(id){ state.progress[state.activeSiteId]=progStore().filter(p=>p.id!==id); saveState(); renderProg(); }
-function delWorkGroup(work){ if(!confirm('刪除整個「'+(work||'未命名')+'」工項的所有樓層進度？'))return; state.progress[state.activeSiteId]=progStore().filter(p=>(p.work||'')!==(work||'')); saveState(); renderProg(); }
-function delFloorGroup(floor){ const target=floor==='(未填樓層)'?'':floor; if(!confirm('刪除「'+floor+'」的所有工項進度？'))return; state.progress[state.activeSiteId]=progStore().filter(p=>(p.floor||'')!==target); saveState(); renderProg(); }
-function openProgCard(id){
-  const p=progById(id); if(!p)return;
-  const v=Math.max(0,Math.min(100,+p.percent||0));
-  openModal(`<h3>${esc(p.work)} — ${esc(p.floor||'')} <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="prog-rowtop"><span class="prog-floor">進度</span><span class="prog-pct" id="card-pct">${v}%</span></div>
-    <div class="prog-bar"><div class="prog-fill${v>=100?' full':''}" id="card-fill" style="width:${v}%"></div></div>
-    <input class="prog-slider" type="range" min="0" max="100" step="5" value="${v}" oninput="document.getElementById('card-pct').textContent=this.value+'%';document.getElementById('card-fill').style.width=this.value+'%'" onchange="setProgPctCard('${id}',this.value)">
-    <div class="row" style="margin-top:16px"><button class="btn gray" onclick="delProgCard('${id}')">刪除此項</button><button class="btn" onclick="closeModal()">完成</button></div>`);
-}
-function setProgPctCard(id,v){ const p=progById(id); if(p){ p.percent=Math.max(0,Math.min(100,parseInt(v)||0)); saveState(); renderProg(); } }
-function delProgCard(id){ if(!confirm('刪除此進度項？'))return; delProg(id); closeModal(); }
-function openProgAdd(){
-  const opts=['<option value="">選擇工項</option>',...workList().map(w=>`<option>${esc(w)}</option>`)].join('');
-  openModal(`<h3>新增進度項 <span class="x" onclick="closeModal()">×</span></h3>
-    <label class="fld"><span>工項</span><select class="inp" id="paWork">${opts}</select></label>
-    <label class="fld"><span>樓層/區域</span><input class="inp" id="paFloor" placeholder="例：3F-A區"></label>
-    <label class="fld"><span>目前進度 %</span><input class="inp" id="paPct" type="number" inputmode="numeric" value="0"></label>
-    <button class="btn full" onclick="addProgDirect()">新增</button>`);
-}
-function addProgDirect(){
-  const work=(document.getElementById('paWork').value||'').trim();
-  const floor=(document.getElementById('paFloor').value||'').trim();
-  let pct=parseInt(document.getElementById('paPct').value)||0; pct=Math.max(0,Math.min(100,pct));
-  if(!work) return toast('請選擇工項');
-  const p=upsertProgress(work, floor, ''); p.percent=pct;
-  saveState(); closeModal(); renderProg();
-}
 
 /* =================== 設定／備份還原 =================== */
 function applyTheme(){
