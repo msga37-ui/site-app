@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>進度色比較</title>
+<title>進度色比較 v2</title>
 <style>
-:root{--card:#1c1c1e;--text:#f2f2f7;--text2:#98989f;--inp:#2c2c2e;--green:#34C759}
+:root{--card:#1c1c1e;--text:#f2f2f7;--text2:#98989f;--inp:#2c2c2e;--green:#34C759;--blue:#007AFF}
 *{box-sizing:border-box}
 body{margin:0;background:#000;color:var(--text);font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;padding:18px 14px 40px}
 h1{font-size:18px;margin:4px 2px 4px}
@@ -24,23 +24,22 @@ h1{font-size:18px;margin:4px 2px 4px}
 .tbar{flex:1;height:12px;border-radius:6px;background:var(--inp);overflow:hidden}
 .tfill{height:100%;border-radius:6px;width:80%}
 .pill{display:inline-block;margin-top:12px;font-size:13px;font-weight:700;padding:7px 13px;border-radius:999px;border:1.5px solid}
-.done{margin-left:8px;color:#1a8c3a;background:rgba(52,199,89,.18);border:1.5px solid transparent}
+.lk{display:inline-block;margin-top:10px;color:var(--blue);font-weight:700;font-size:13px}
 </style>
 </head>
 <body>
-<h1>進度色比較</h1>
-<p class="note">每張卡是一種「進度色」的實際樣子（總進度條＋工項細條＋進行中膠囊）。完成狀態一律維持綠色。挑你看起來最舒服的，把<b>編號</b>告訴我即可。</p>
+<h1>進度色比較 v2</h1>
+<p class="note">靛藍跟一般藍/字太接近會失焦，這批換成「跟藍色明顯區隔、對比夠又不刺眼」的候選。每張下面那個藍字「編輯」是一般UI藍，幫你對比進度色有沒有跟它分得開。挑一個把<b>編號</b>給我。</p>
 <div id="list"></div>
 <script>
 const opts=[
-  ['1','iOS 藍（目前一般UI色）','#007AFF'],
-  ['2','靛藍 indigo','#5856D6'],
-  ['3','青綠 teal','#30B0C7'],
-  ['4','霧霾藍 dusty blue','#5E7CA3'],
-  ['5','鼠尾草綠 sage','#6FA287'],
-  ['6','灰藏青 slate','#42607C'],
-  ['7','暖琥珀 amber','#E0922F'],
-  ['8','洋紅（目前進度色，太搶）','#FF2D78'],
+  ['1','青綠 teal','#10A8A8'],
+  ['2','深青 cyan','#0E8FC0'],
+  ['3','琥珀 amber','#E08A0B'],
+  ['4','珊瑚 coral','#F26A5E'],
+  ['5','玫瑰 rose','#DE4E7C'],
+  ['6','紫羅蘭 violet','#8B5CF6'],
+  ['7','靛藍（目前，太接近藍）','#5856D6'],
 ];
 document.getElementById('list').innerHTML=opts.map(([n,name,c])=>`
   <div class="sw">
@@ -57,7 +56,7 @@ document.getElementById('list').innerHTML=opts.map(([n,name,c])=>`
     </div>
     <div>
       <span class="pill" style="color:${c};border-color:${c};background:${c}14">A棟4F 80%</span>
-      <span class="pill done">B6F ✓</span>
+      <span class="lk">編輯</span>
     </div>
   </div>`).join('');
 </script>
