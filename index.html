@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="泰郡工務系統">
 <style>
 :root{
-  --blue:#007AFF; --green:#34C759; --orange:#FF9500; --red:#FF3B30; --purple:#AF52DE;
+  --blue:#007AFF; --green:#34C759; --orange:#FF9500; --red:#FF3B30; --purple:#AF52DE; --prog:#FF2D78;
   --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --text2:#8e8e93; --border:#e2e2e7;
   --inp:#f7f7fa; --shadow:0 1px 3px rgba(0,0,0,.08); --bar:rgba(255,255,255,.92);
   --safe-b:env(safe-area-inset-bottom,0px);
@@ -93,7 +93,7 @@ textarea.inp{resize:vertical; min-height:60px}
   flex:1; padding:8px 0 7px; display:flex; flex-direction:column; align-items:center; gap:2px;
   color:var(--text2); font-size:11px; font-weight:600;
 }
-.tabbar button .ic{font-size:21px; line-height:1}
+.tabbar button .ic{width:24px; height:24px; display:block}
 .tabbar button.on{color:var(--blue)}
 
 /* ===== 月曆 ===== */
@@ -247,10 +247,10 @@ textarea.inp{resize:vertical; min-height:60px}
 .ps-head{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer}
 .ps-name{font-weight:800; font-size:16px; color:var(--blue)}
 .ps-meta{font-size:13px; color:var(--text2); font-weight:600; display:flex; align-items:center; gap:5px; white-space:nowrap}
-.ps-meta b{color:var(--text); font-size:15px}
+.ps-meta b{color:var(--prog); font-size:15px}
 .ps-caret{color:var(--text2); font-size:12px}
 .thin-bar{position:relative; height:14px; border-radius:6px; background:var(--inp); overflow:hidden; margin:8px 0}
-.thin-fill{height:100%; background:var(--blue); transition:width .15s}
+.thin-fill{height:100%; background:var(--prog); transition:width .15s}
 .thin-fill.full{background:var(--green)}
 .thin-bar::after{content:''; position:absolute; inset:0; pointer-events:none;
   background:repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 2px), var(--bg) calc(10% - 2px), var(--bg) 10%)}
@@ -259,11 +259,11 @@ textarea.inp{resize:vertical; min-height:60px}
 .ph-row{display:flex; align-items:center; gap:10px; padding:5px 2px}
 .ph-date{flex:none; width:46px; font-size:13px; color:var(--text2); font-weight:600}
 .ph-bar{flex:1; height:10px; background:var(--inp); border-radius:6px; overflow:hidden}
-.ph-fill{display:block; height:100%; background:var(--blue); border-radius:6px}
+.ph-fill{display:block; height:100%; background:var(--prog); border-radius:6px}
 .ph-fill.full{background:var(--green)}
 .ph-pct{flex:none; width:42px; text-align:right; font-size:13px; font-weight:700}
 .floor-pill.zero{color:var(--text2); background:var(--inp); opacity:.65}
-.floor-pill.active{color:var(--text); background:var(--card); border-color:var(--text2)}
+.floor-pill.active{color:var(--prog); background:rgba(255,45,120,.08); border-color:var(--prog)}
 .floor-pill.done{color:#1a8c3a; background:rgba(52,199,89,.18); border-color:transparent}
 
 /* ===== 記錄卡片 / 表單項目 ===== */
@@ -359,7 +359,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .modal h3{margin:0 0 14px; display:flex; justify-content:space-between; align-items:center}
 .modal h3 .x{font-size:24px; color:var(--text2); padding:0 6px}
 
-.empty{text-align:center; color:var(--text2); padding:36px 12px; font-size:14px}
+.empty{text-align:center; color:var(--text2); padding:44px 16px; font-size:14px; line-height:1.9}
 .toast{
   position:fixed; left:50%; bottom:calc(86px + var(--safe-b)); transform:translateX(-50%);
   background:rgba(0,0,0,.85); color:#fff; padding:11px 18px; border-radius:999px; font-size:14px;
@@ -482,11 +482,11 @@ textarea.inp{resize:vertical; min-height:60px}
 
 <!-- 底部 tab -->
 <div class="tabbar">
-  <button id="tab-log" class="on" onclick="switchTab('log')"><span class="ic">📅</span>日誌</button>
-  <button id="tab-prog" onclick="switchTab('prog')"><span class="ic">📊</span>進度</button>
-  <button id="tab-mat" onclick="switchTab('mat')"><span class="ic">📦</span>材料</button>
-  <button id="tab-photo" onclick="switchTab('photo')"><span class="ic">📷</span>照片</button>
-  <button id="tab-labor" onclick="switchTab('labor')"><span class="ic">🧰</span>點工</button>
+  <button id="tab-log" class="on" onclick="switchTab('log')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 3v3.5M16 3v3.5"/></svg>日誌</button>
+  <button id="tab-prog" onclick="switchTab('prog')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M7 20v-6M12 20v-11M17 20v-8"/></svg>進度</button>
+  <button id="tab-mat" onclick="switchTab('mat')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.5l-9-5-9 5 9 5 9-5z"/><path d="M3 8.5v7l9 5 9-5v-7M12 13.5v7"/></svg>材料</button>
+  <button id="tab-photo" onclick="switchTab('photo')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h2l1.5-2h5L17 7h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>照片</button>
+  <button id="tab-labor" onclick="switchTab('labor')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="2"/><path d="M3 13h18M9 8V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5V8"/></svg>點工</button>
 </div>
 
 <!-- modal 容器 -->
@@ -771,7 +771,7 @@ function renderDay(){
   const recs=recordsOn(view.selDate), atts=attendOn(view.selDate), txs=matTxOn(view.selDate), labs=laborOn(view.selDate);
   const ins=txs.filter(t=>t.type==='in'), outs=txs.filter(t=>t.type==='out'), rets=txs.filter(t=>t.type==='ret');
   const box=document.getElementById('dayLogs');
-  if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">這天還沒有記錄<br>點右上「＋ 新增」記錄施工或出勤</div>`; return; }
+  if(!recs.length && !atts.length && !txs.length && !labs.length){ box.innerHTML=`<div class="empty">今天還沒填報<br>點右上 ＋ 記一筆施工或出勤</div>`; return; }
   let html = recs.map(recordCard).join('') + atts.map(attendCard).join('');
   if(ins.length) html += matTxGroupCard('in', ins);
   if(outs.length) html += matTxGroupCard('out', outs);
@@ -1297,7 +1297,7 @@ function renderMatSummary(){
     });
     if(rows) html+=`<div class="sum-cat">${esc(c.name)}</div>${rows}`;
   });
-  document.getElementById('matSummaryList').innerHTML=html||`<div class="empty">還沒有進料/已用紀錄<br>到「材料清單」點品項，記一筆進料開始</div>`;
+  document.getElementById('matSummaryList').innerHTML=html||`<div class="empty">還沒有進出紀錄<br>到「材料清單」點品項，記第一筆進料</div>`;
 }
 let _order=null;
 function openOrderForm(id){
@@ -1344,7 +1344,7 @@ function saveOrder(){
 function renderOrders(){
   const list=ordStore();
   const box=document.getElementById('ordersList');
-  if(!list.length){ box.innerHTML=`<div class="empty">還沒有材料訂單<br>點「＋ 新增訂單」或在材料清單按「🛒」</div>`; return; }
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有訂單<br>點 ＋新增訂單，或在材料清單按 🛒 加叫貨</div>`; return; }
   box.innerHTML=list.slice().reverse().map(o=>{
     const lines=o.lines.map(l=>`<div class="rc-line"><b>${esc(l.name)}</b> <span class="muted">${esc(l.spec||'')}</span> <span class="rc-pct">${esc(String(l.qty))}${esc(l.unit||'')}</span></div>`).join('');
     return `<div class="log-card">
@@ -1375,7 +1375,7 @@ function renderPhotoRecs(){
   if(ti)ti.value=h.title||''; if(pj)pj.value=h.project||activeSite().name; if(vd)vd.value=h.vendor||'';
   const recs=photoRecStore();
   const box=document.getElementById('photoRecList');
-  if(!recs.length){ box.innerHTML=`<div class="empty">還沒有照片<br>點右上「＋ 照片」開始</div>`; return; }
+  if(!recs.length){ box.innerHTML=`<div class="empty">還沒有照片<br>點右上 ＋ 照片，加第一張</div>`; return; }
   box.innerHTML=recs.map((r,i)=>photoRecCard(r,i)).join('');
   recs.forEach(r=>loadPhotoThumb(r));
 }
@@ -1491,7 +1491,7 @@ function laborOn(date){ return laborStore().filter(l=>l.date===date); }
 function renderLabor(){
   const list=laborStore().slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
   const box=document.getElementById('laborList');
-  if(!list.length){ box.innerHTML=`<div class="empty">還沒有點工單<br>點右上「＋ 新增」建立叫工紀錄</div>`; return; }
+  if(!list.length){ box.innerHTML=`<div class="empty">還沒有點工<br>點右上 ＋ 記一筆叫工</div>`; return; }
   box.innerHTML=list.map(laborCard).join('');
   list.forEach(l=>{ if(lbPhotos(l).length) loadLaborThumb(l); });
 }
@@ -1633,10 +1633,10 @@ function renderProgSummary(){
   const avg=list.length?Math.round(list.reduce((t,p)=>t+(+p.percent||0),0)/list.length):0;
   const {map,order}=vendorHeadcounts();
   const vstr = order.length ? order.map(v=>`${esc(v)} 總出工${Math.round(map[v]*10)/10}人`).join('　') : esc(activeSite().name);
-  document.getElementById('progSummary').innerHTML=`<div class="card prog-summary">
+  document.getElementById('progSummary').innerHTML=`<div class="card prog-summary" onclick="openOverallHistory()" style="cursor:pointer">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div class="muted" style="font-size:13px;line-height:1.6;flex:1">${vstr}</div>
-      <div style="font-size:24px;font-weight:800;color:#FF2D78">${avg}%</div>
+      <div style="font-size:28px;font-weight:800;color:var(--prog);letter-spacing:-.5px">${avg}%</div>
     </div>
     <div class="grad-bar"><div class="grad-fill" style="width:${avg}%"></div></div>
   </div>`;
@@ -1648,7 +1648,7 @@ function renderProg(){
   const box=document.getElementById('progList');
   const fsel=document.getElementById('progFilter');
   if(fsel){ const works=[...new Set(all.map(p=>p.work).filter(Boolean))]; if(view.progFilter&&!works.includes(view.progFilter))view.progFilter=''; fsel.innerHTML='<option value="">全部工項</option>'+works.map(w=>`<option${w===view.progFilter?' selected':''}>${esc(w)}</option>`).join(''); }
-  if(!all.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現</div>`; return; }
+  if(!all.length){ box.innerHTML=`<div class="empty">還沒有進度<br>在日誌記一筆、拉一下進度滑桿，這裡就會出現</div>`; return; }
   const list = view.progFilter ? all.filter(p=>p.work===view.progFilter) : all;
   box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
 }
@@ -1695,6 +1695,26 @@ function progHistory(id){
   return Object.keys(map).sort((a,b)=> a<b?-1:1).map(d=>({date:d, percent:map[d]}));
 }
 function mdLabel(ds){ const p=String(ds).split('-'); return (+p[1])+'/'+(+p[2]); }
+function overallHistory(){
+  const list=progStore(); if(!list.length) return [];
+  const hist={}, dset=new Set();
+  list.forEach(p=>{ const h=progHistory(p.id); hist[p.id]=h; h.forEach(x=>dset.add(x.date)); });
+  const dates=[...dset].sort((a,b)=> a<b?-1:1);
+  return dates.map(d=>{ let sum=0; list.forEach(p=>{ let v=0; for(const x of hist[p.id]){ if(x.date<=d) v=x.percent; else break; } sum+=v; }); return { date:d, percent:Math.round(sum/list.length) }; });
+}
+function openOverallHistory(){
+  const list=progStore();
+  const cur=list.length?Math.round(list.reduce((t,p)=>t+(+p.percent||0),0)/list.length):0;
+  const hist=overallHistory();
+  const rows=hist.length
+    ? hist.map(h=>{ const v=Math.max(0,Math.min(100,+h.percent||0)); return `<div class="ph-row"><span class="ph-date">${mdLabel(h.date)}</span><span class="ph-bar"><span class="ph-fill${v>=100?' full':''}" style="width:${v}%"></span></span><span class="ph-pct">${v}%</span></div>`; }).join('')
+    : `<div class="muted" style="margin:6px 0 2px">尚無歷程紀錄；之後在日誌拉滑桿存檔，就會開始累積。</div>`;
+  openModal(`<h3>整體進度歷程 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:12px">${esc(activeSite().name)}　目前 <b style="color:var(--prog)">${cur}%</b></div>
+    ${hist.length?'<div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 6px">整體 %（各工項平均）</div>':''}
+    ${rows}
+    <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+}
 function openProgHistory(id){
   const p=progById(id); if(!p)return;
   const cur=Math.max(0,Math.min(100,+p.percent||0));
@@ -1703,7 +1723,7 @@ function openProgHistory(id){
     ? hist.map(h=>{ const v=Math.max(0,Math.min(100,+h.percent||0)); return `<div class="ph-row"><span class="ph-date">${mdLabel(h.date)}</span><span class="ph-bar"><span class="ph-fill${v>=100?' full':''}" style="width:${v}%"></span></span><span class="ph-pct">${v}%</span></div>`; }).join('')
     : `<div class="muted" style="margin:6px 0 2px">尚無歷程紀錄；之後在日誌拉滑桿存檔，就會開始累積。</div>`;
   openModal(`<h3>${esc(p.work)}${p.floor?' — '+esc(p.floor):''} <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="muted" style="margin-bottom:12px">${p.vendor?'廠商：'+esc(p.vendor)+'　':''}目前 <b style="color:var(--blue)">${cur}%</b></div>
+    <div class="muted" style="margin-bottom:12px">${p.vendor?'廠商：'+esc(p.vendor)+'　':''}目前 <b style="color:var(--prog)">${cur}%</b></div>
     ${hist.length?'<div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 6px">進度歷程</div>':''}
     ${rows}
     <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
