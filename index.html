@@ -405,10 +405,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div id="progSummary"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 2px 12px;gap:8px">
     <button class="btn ghost sm" id="progViewBtn" onclick="toggleProgView()">依工項</button>
-    <div style="display:flex;gap:8px">
-      <button class="btn ghost sm" id="progEditBtn" onclick="toggleProgEdit()">編輯</button>
-      <button class="btn sm" onclick="openProgAdd()">＋ 工項</button>
-    </div>
+    <select class="inp" id="progFilter" onchange="setProgFilter(this.value)" style="flex:1;max-width:62%"></select>
   </div>
   <div id="progList"></div>
 </div>
@@ -569,7 +566,7 @@ function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progView:'work', workCollapsed:{}, floorCollapsed:{},
+let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progEdit:false, progView:'work', progFilter:'', workCollapsed:{}, floorCollapsed:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
@@ -1222,7 +1219,7 @@ function openMatDetail(name){
   const specRows = order.length ? order.map(k=>{ const s=map[k]; return `<div class="inv-row"><span class="inv-spec">${esc(k)}</span><span class="inv-nums">進${f2(s.in)}／用${f2(s.out)}${s.ret?'／退'+f2(s.ret):''}／<b>剩${f2(s.in-s.out-s.ret)}</b></span></div>`; }).join('') : '<div class="muted" style="margin:4px 0">尚無進料/已用紀錄</div>';
   const totalBal=f2(itemBalance(name));
   const sorted=txs.slice().sort((a,b)=> a.date<b.date?1:(a.date>b.date?-1:0));
-  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${txLabel(t.type)}</span><span class="tx-info">${esc(t.date)}${t.ts?' '+txTime(t.ts):''}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
+  const txList = sorted.length ? sorted.map(t=>`<div class="tx-row"><span class="tx-tag ${t.type}">${txLabel(t.type)}</span><span class="tx-info">${esc(t.date)}${t.ts?' '+txTime(t.ts):''}${t.spec?' '+esc(t.spec):''} <b>${f2(t.qty)}${esc(unit)}</b></span><button class="del" onclick="openTxForm('${esc(name)}','${t.type}','${t.id}')">✎</button><button class="del" onclick="delTx('${t.id}','${esc(name)}')">🗑</button></div>`).join('') : '<div class="muted" style="margin:4px 0">尚無紀錄</div>';
   openModal(`<h3>${esc(name)} <small style="color:var(--text2);font-size:13px">${esc(unit)}</small> <span class="x" onclick="closeMatDetail()">×</span></h3>
     <div class="inv-summary">
       <div class="muted" style="font-size:12px">結存合計</div>
@@ -1238,26 +1235,31 @@ function openMatDetail(name){
     ${txList}
     <button class="btn ghost full" style="margin-top:14px" onclick="closeMatDetail()">完成</button>`);
 }
-function openTxForm(name, type){
+function openTxForm(name, type, editId){
   const def=getMatDef(name);
   const presets=(def.presets||[]);
-  const tl=txLabel(type);
+  const ed = editId ? itemTxs(name).find(t=>t.id===editId) : null;
+  const cur = ed ? ed.type : type;
+  const typeOpts=['in','out','ret'].map(tp=>`<option value="${tp}"${tp===cur?' selected':''}>${txLabel(tp)}</option>`).join('');
   const chips=presets.map(p=>`<button type="button" class="preset-chip" onclick="document.getElementById('txSpec').value='${esc(p)}'">${esc(p)}</button>`).join('');
-  openModal(`<h3>＋ ${tl} — ${esc(name)} <span class="x" onclick="openMatDetail('${esc(name)}')">×</span></h3>
-    <label class="fld"><span>日期</span><input class="inp" type="date" id="txDate" value="${todayStr()}"></label>
-    <label class="fld"><span>規格（可留空）</span><input class="inp" id="txSpec" placeholder="例：9mm"></label>
+  openModal(`<h3>${ed?'編輯紀錄':'＋ '+txLabel(cur)} — ${esc(name)} <span class="x" onclick="openMatDetail('${esc(name)}')">×</span></h3>
+    <label class="fld"><span>類型</span><select class="inp" id="txType">${typeOpts}</select></label>
+    <label class="fld"><span>日期</span><input class="inp" type="date" id="txDate" value="${ed?esc(ed.date):todayStr()}"></label>
+    <label class="fld"><span>規格（可留空）</span><input class="inp" id="txSpec" value="${ed?esc(ed.spec||''):''}" placeholder="例：9mm"></label>
     ${presets.length?`<div class="presets" style="margin:-4px 0 10px">${chips}</div>`:''}
-    <label class="fld"><span>數量（${esc(def.unit||'')}）</span><input class="inp" id="txQty" type="number" inputmode="decimal" placeholder="例：300"></label>
-    <button class="btn full${type==='in'?' green':''}" style="${type==='ret'?'background:var(--purple);color:#fff':''}" onclick="saveTx('${esc(name)}','${type}')">儲存${tl}</button>`);
+    <label class="fld"><span>數量（${esc(def.unit||'')}）</span><input class="inp" id="txQty" type="number" inputmode="decimal" value="${ed?f2(ed.qty):''}" placeholder="例：300"></label>
+    <button class="btn full green" onclick="saveTx('${esc(name)}'${editId?",'"+editId+"'":''})">${ed?'儲存修改':'儲存'}</button>`);
   setTimeout(()=>{ const el=document.getElementById('txQty'); if(el)el.focus(); },80);
 }
-function saveTx(name, type){
+function saveTx(name, editId){
+  const type=document.getElementById('txType').value;
   const date=document.getElementById('txDate').value||todayStr();
   const spec=(document.getElementById('txSpec').value||'').trim();
   const qty=parseFloat(document.getElementById('txQty').value)||0;
   if(!qty) return toast('請輸入數量');
-  matTxStore().push({id:uid(), date, ts:Date.now(), type, item:name, spec, qty});
-  view.selDate=date; saveState(); openMatDetail(name); toast('已記'+txLabel(type));
+  if(editId){ const t=itemTxs(name).find(x=>x.id===editId); if(t){ t.type=type; t.date=date; t.spec=spec; t.qty=qty; } }
+  else { matTxStore().push({id:uid(), date, ts:Date.now(), type, item:name, spec, qty}); }
+  view.selDate=date; saveState(); openMatDetail(name); toast(editId?'已修改':'已記'+txLabel(type));
 }
 function delTx(id, name){ if(!confirm('刪除此筆紀錄？'))return; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.id!==id); saveState(); openMatDetail(name); }
 function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); afterMatChange(); }
@@ -1505,10 +1507,10 @@ function renderLabor(){
   const box=document.getElementById('laborList');
   if(!list.length){ box.innerHTML=`<div class="empty">還沒有點工單<br>點右上「＋ 新增」建立叫工紀錄</div>`; return; }
   box.innerHTML=list.map(laborCard).join('');
-  list.forEach(l=>{ if(l.photoId) loadLaborThumb(l); });
+  list.forEach(l=>{ if(lbPhotos(l).length) loadLaborThumb(l); });
 }
 function laborCard(l){
-  const photoStrip=l.photoId?`<div class="photo-strip" id="lbph-${l.id}"></div>`:'';
+  const photoStrip=lbPhotos(l).length?`<div class="photo-strip" id="lbph-${l.id}"></div>`:'';
   return `<div class="log-card">
     <div class="lc-top"><div style="font-weight:700">🧰 ${esc(l.trade||'點工')}${l.count?' ｜ '+esc(String(l.count))+'名':''}</div><button class="btn green sm" onclick="shareLabor('${l.id}')">LINE</button></div>
     <div class="lc-meta">${esc(l.date||'')}${l.source?' ｜ 廠商：'+esc(l.source):''}</div>
@@ -1517,19 +1519,21 @@ function laborCard(l){
     <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost sm" onclick="openLaborForm('${l.id}')">編輯</button><button class="btn gray sm" onclick="delLabor('${l.id}')">刪除</button></div>
   </div>`;
 }
-async function loadLaborThumb(l){ try{ const rec=await photoGet(l.photoId); if(rec&&rec.blob){ const el=document.getElementById('lbph-'+l.id); if(el){ const u=URL.createObjectURL(rec.blob); el.innerHTML=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } } }catch(e){} }
+async function loadLaborThumb(l){ const el=document.getElementById('lbph-'+l.id); if(!el)return; let html=''; for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); html+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){} } el.innerHTML=html; }
 function laborDayCard(l){
   return `<div class="log-card"><div class="lc-top"><div style="font-weight:700">🧰 點工：${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">廠商：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
 }
-let _labor=null, _laborPhoto=null;
+let _labor=null, _laborPhotos=[], _laborOrigPhotoIds=[];
+function lbPhotos(l){ return l.photoIds || (l.photoId?[l.photoId]:[]); }
 function openLaborForm(id){
   const editing=id?laborStore().find(l=>l.id===id):null;
   _labor = editing
-    ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||LABOR_TRADES[0], source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', oldPhotoId:editing.photoId||null, editId:id }
-    : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:(tradeList()[0]||''), source:'', count:'', reason:'', oldPhotoId:null, editId:null };
-  _laborPhoto = (editing&&editing.photoId)?{id:editing.photoId, existing:true}:null;
+    ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||LABOR_TRADES[0], source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', editId:id }
+    : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:(tradeList()[0]||''), source:'', count:'', reason:'', editId:null };
+  _laborOrigPhotoIds = editing ? lbPhotos(editing).slice() : [];
+  _laborPhotos = [];
   showLaborModal();
-  if(editing&&editing.photoId){ (async()=>{ try{ const rec=await photoGet(editing.photoId); if(rec&&rec.blob){ _laborPhoto={id:editing.photoId,url:URL.createObjectURL(rec.blob),existing:true}; renderLaborPhoto(); } }catch(e){} })(); }
+  if(_laborOrigPhotoIds.length){ (async()=>{ for(const pid of _laborOrigPhotoIds){ try{ const rec=await photoGet(pid); if(rec&&rec.blob)_laborPhotos.push({id:pid,url:URL.createObjectURL(rec.blob)}); }catch(e){} } renderLaborPhotos(); })(); }
 }
 function tradeList(){ if(!state.laborTrades) state.laborTrades=LABOR_TRADES.slice(); return state.laborTrades; }
 function openTradeManage(){
@@ -1556,31 +1560,32 @@ function showLaborModal(){
     <label class="fld"><span>工作內容</span><textarea class="inp" onchange="_labor.reason=this.value" placeholder="例：A區矽酸鈣板廢料清理運送、3F隔間局部修改代工">${esc(_labor.reason)}</textarea></label>
     <div style="font-size:12px;font-weight:700;color:var(--text2);margin:2px 2px 4px">照片存證</div>
     <div class="photo-strip" id="laborPhotoStrip"></div>
-    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" style="display:none" onchange="setLaborPhoto(this.files)"></label>
+    <label class="btn ghost full" style="margin-bottom:12px">📷 拍照／選相簿<input type="file" accept="image/*" multiple style="display:none" onchange="addLaborPhotos(this.files);this.value=''"></label>
     <button class="btn full" onclick="saveLabor()">儲存</button>`);
-  renderLaborPhoto();
+  renderLaborPhotos();
 }
-function renderLaborPhoto(){ const el=document.getElementById('laborPhotoStrip'); if(!el)return; el.innerHTML=(_laborPhoto&&_laborPhoto.url)?`<div class="thumb"><img src="${_laborPhoto.url}"></div>`:'<span class="muted">尚無照片</span>'; }
-async function setLaborPhoto(files){ const f=files&&files[0]; if(!f)return; toast('處理照片中…'); const blob=await normalizeImage(f); _laborPhoto={id:uid(), blob, url:URL.createObjectURL(blob)}; renderLaborPhoto(); }
+function renderLaborPhotos(){ const el=document.getElementById('laborPhotoStrip'); if(!el)return; el.innerHTML=_laborPhotos.length?_laborPhotos.map((p,i)=>`<div class="thumb"><img src="${p.url}"><button class="thumb-x" onclick="removeLaborPhoto(${i})">×</button></div>`).join(''):'<span class="muted">尚無照片</span>'; }
+async function addLaborPhotos(files){ for(const f of [...files]){ const blob=await normalizeImage(f); _laborPhotos.push({id:uid(), blob, url:URL.createObjectURL(blob)}); } renderLaborPhotos(); }
+function removeLaborPhoto(i){ const p=_laborPhotos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _laborPhotos.splice(i,1); renderLaborPhotos(); }
 async function saveLabor(){
   const target=_labor.siteId||state.activeSiteId;
-  let photoId=_laborPhoto?_laborPhoto.id:null;
-  if(_laborPhoto&&_laborPhoto.blob){ try{ await photoPut(_laborPhoto.id,_laborPhoto.blob,{date:_labor.date}); }catch(e){} }
-  if(_labor.oldPhotoId && _labor.oldPhotoId!==photoId){ photoDel(_labor.oldPhotoId).catch(()=>{}); }
+  for(const p of _laborPhotos){ if(p.blob){ try{ await photoPut(p.id,p.blob,{date:_labor.date}); }catch(e){} } }
+  const photoIds=_laborPhotos.map(p=>p.id);
+  for(const oid of _laborOrigPhotoIds){ if(!photoIds.includes(oid)){ try{ await photoDel(oid); }catch(e){} } }
   if(_labor.editId && _labor.origSiteId && _labor.origSiteId!==target && state.labor[_labor.origSiteId]){ state.labor[_labor.origSiteId]=state.labor[_labor.origSiteId].filter(x=>x.id!==_labor.editId); }
   state.activeSiteId=target;
-  const rec={ id:_labor.editId||uid(), date:_labor.date||todayStr(), trade:_labor.trade||'', source:_labor.source||'', count:(_labor.count===''?'':(+_labor.count||0)), reason:_labor.reason||'', photoId };
+  const rec={ id:_labor.editId||uid(), date:_labor.date||todayStr(), trade:_labor.trade||'', source:_labor.source||'', count:(_labor.count===''?'':(+_labor.count||0)), reason:_labor.reason||'', photoIds };
   const store=laborStore();
   const idx=_labor.editId?store.findIndex(x=>x.id===_labor.editId):-1;
   if(idx>=0) store[idx]=rec; else store.push(rec);
   view.selDate=rec.date; saveState(); closeModal(); renderAll(); switchTab('labor'); toast('點工已儲存');
 }
-function delLabor(id){ if(!confirm('刪除此點工單？'))return; const l=laborStore().find(x=>x.id===id); if(l&&l.photoId)photoDel(l.photoId).catch(()=>{}); state.labor[state.activeSiteId]=laborStore().filter(x=>x.id!==id); saveState(); renderLabor(); renderCalendar(); renderDay(); }
+function delLabor(id){ if(!confirm('刪除此點工單？'))return; const l=laborStore().find(x=>x.id===id); if(l)lbPhotos(l).forEach(pid=>photoDel(pid).catch(()=>{})); state.labor[state.activeSiteId]=laborStore().filter(x=>x.id!==id); saveState(); renderLabor(); renderCalendar(); renderDay(); }
 function laborLineText(l){ return `【點工】${activeSite().name}\n【日期】${l.date}\n【工種】${l.trade||'-'}${l.count?'（'+l.count+'名）':''}\n【廠商】${l.source||'-'}\n【工作內容】${l.reason||'-'}`; }
 async function shareLabor(id){
   const l=laborStore().find(x=>x.id===id); if(!l)return;
   const txt=laborLineText(l); let files=[];
-  if(l.photoId){ try{ const rec=await photoGet(l.photoId); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; files.push(new File([rec.blob],'labor.'+(t.includes('png')?'png':'jpg'),{type:t})); } }catch(e){} }
+  for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const t=rec.blob.type||'image/jpeg'; files.push(new File([rec.blob],pid+'.'+(t.includes('png')?'png':'jpg'),{type:t})); } }catch(e){} }
   try{ await navigator.clipboard.writeText(txt); }catch(e){}
   if(navigator.share){ const payload={text:txt}; if(files.length&&navigator.canShare&&navigator.canShare({files}))payload.files=files; try{ await navigator.share(payload); return; }catch(e){ if(e.name==='AbortError')return; } }
   toast(files.length?'文字已複製（此裝置不支援帶圖分享）':'已複製，貼到 LINE 群組即可');
@@ -1641,6 +1646,7 @@ function toggleProgEdit(){
   renderProg();
 }
 function toggleProgView(){ view.progView = view.progView==='floor'?'work':'floor'; renderProg(); }
+function setProgFilter(v){ view.progFilter=v; renderProg(); }
 function floorOrderNum(f){ const m=String(f).match(/^([BR]?)(\d+)/i); if(!m) return 99999; let n=parseInt(m[2]); const pfx=(m[1]||'').toUpperCase(); if(pfx==='B')n=-1000-n; if(pfx==='R')n=10000+n; return n; }
 function renderProgSummary(){
   const list=progStore();
@@ -1658,13 +1664,16 @@ function renderProgSummary(){
 function renderProg(){
   const vb=document.getElementById('progViewBtn'); if(vb) vb.textContent = view.progView==='floor'?'依樓層':'依工項';
   renderProgSummary();
-  const list=progStore();
+  const all=progStore();
   const box=document.getElementById('progList');
-  if(!list.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現<br>（或點右上「＋ 工項」直接新增）</div>`; return; }
+  const fsel=document.getElementById('progFilter');
+  if(fsel){ const works=[...new Set(all.map(p=>p.work).filter(Boolean))]; if(view.progFilter&&!works.includes(view.progFilter))view.progFilter=''; fsel.innerHTML='<option value="">全部工項</option>'+works.map(w=>`<option${w===view.progFilter?' selected':''}>${esc(w)}</option>`).join(''); }
+  if(!all.length){ box.innerHTML=`<div class="empty">還沒有進度資料<br>到「日誌」新增記錄、拉進度，這裡會自動出現</div>`; return; }
+  const list = view.progFilter ? all.filter(p=>p.work===view.progFilter) : all;
   box.innerHTML = view.progView==='floor' ? progHtmlByFloor(list) : progHtmlByWork(list);
 }
-function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgCard('${p.id}')">${esc(p.floor||'?')} ${v}%</span>`; }
-function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgCard('${p.id}')">${esc(p.work)} ${v}%</span>`; }
+function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.floor||'?')} ${v}%</span>`; }
+function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}">${esc(p.work)} ${v}%</span>`; }
 function progSect(name, kind, avg, meta, collapsed, pillsHtml, delFn){
   const caret=collapsed?'▶':'▼';
   const del=view.progEdit?` <button class="del" onclick="event.stopPropagation();${delFn}">🗑</button>`:'';
