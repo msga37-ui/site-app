@@ -83,6 +83,12 @@ textarea.inp{resize:vertical; min-height:60px}
 .bic{width:16px; height:16px; vertical-align:-3px; margin-right:5px; display:inline-block}
 .set-sec{font-size:12px; font-weight:800; color:var(--text2); letter-spacing:.5px; margin:18px 2px 8px}
 .set-sec:first-of-type{margin-top:6px}
+.gal-nav{position:absolute; top:50%; transform:translateY(-50%); width:38px; height:38px; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; font-size:24px; display:flex; align-items:center; justify-content:center; border:none}
+.srch-row{display:flex; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--border); cursor:pointer}
+.srch-d{flex:none; font-size:12px; color:var(--text2); font-weight:700; width:84px}
+.srch-k{flex:none; font-size:11px; font-weight:700; padding:2px 7px; border-radius:999px; background:var(--inp); color:var(--text2)}
+.srch-t{flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.stall{font-size:11px; font-weight:700; color:#a85d00; background:rgba(255,149,0,.16); padding:2px 7px; border-radius:999px; margin-right:6px}
 .btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
 .btn.full{width:100%}
 .pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
@@ -410,6 +416,7 @@ textarea.inp{resize:vertical; min-height:60px}
   <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px">
     <div style="font-weight:800;font-size:17px" id="dayTitle">當日記錄</div>
     <div style="display:flex;gap:6px">
+      <button class="btn ghost sm" onclick="openLogSearch()" aria-label="搜尋"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-3.5-3.5"/></svg></button>
       <button class="btn green sm" id="dayShareBtn" onclick="shareDay(view.selDate)">LINE</button>
       <button class="btn sm" onclick="newEntry()">＋ 新增</button>
     </div>
@@ -776,6 +783,28 @@ function renderCalendar(){
   document.getElementById('calGrid').innerHTML=html;
 }
 function selectDate(ds){ view.selDate=ds; renderCalendar(); renderDay(); }
+function openLogSearch(){
+  openModal(`<h3>搜尋日誌 <span class="x" onclick="closeModal()">×</span></h3>
+    <input class="inp" id="logQ" placeholder="搜廠商／工項／樓層／備註…" oninput="renderLogSearch(this.value)" autocomplete="off">
+    <div id="logQRes" style="margin-top:12px"><div class="muted" style="padding:6px 2px">輸入關鍵字開始搜尋</div></div>`);
+  setTimeout(()=>{ const e=document.getElementById('logQ'); if(e)e.focus(); },80);
+}
+function renderLogSearch(q){
+  q=(q||'').trim().toLowerCase(); const box=document.getElementById('logQRes'); if(!box)return;
+  if(!q){ box.innerHTML='<div class="muted" style="padding:6px 2px">輸入關鍵字開始搜尋</div>'; return; }
+  const hits=[];
+  recStore().forEach(r=>{
+    const works=(r.items||[]).map(it=>{ const p=progById(it.progressId); return p?(p.work+' '+(p.floor||'')):''; }).join(' ');
+    if(((r.vendor||'')+' '+works+' '+(r.note||'')).toLowerCase().includes(q)){
+      const sum=(r.items||[]).map(it=>{ const p=progById(it.progressId); return p?p.work:''; }).filter(Boolean).join('、');
+      hits.push({date:r.date, kind:'施工', text:(r.vendor||'未填廠商')+'：'+(sum||'-')});
+    }
+  });
+  laborStore().forEach(l=>{ if(((l.trade||'')+' '+(l.source||'')+' '+(l.reason||'')).toLowerCase().includes(q)) hits.push({date:l.date, kind:'點工', text:(l.trade||'')+(l.reason?'　'+l.reason:'')}); });
+  hits.sort((a,b)=> a.date<b.date?1:-1);
+  box.innerHTML = hits.length ? hits.map(h=>`<div class="srch-row" onclick="jumpToDay('${h.date}')"><span class="srch-d">${h.date}</span><span class="srch-k">${h.kind}</span><span class="srch-t">${esc(h.text)}</span></div>`).join('') : '<div class="muted" style="padding:6px 2px">找不到符合的記錄</div>';
+}
+function jumpToDay(d){ closeModal(); view.calYear=+d.slice(0,4); view.calMonth=+d.slice(5,7)-1; if(view.tab!=='log')switchTab('log'); selectDate(d); }
 
 function matTxOn(date){ return matTxStore().filter(t=>t.date===date); }
 function matTxGroupCard(type, list){
@@ -828,12 +857,28 @@ async function loadCardThumbs(recs){
     const el=document.getElementById('ph-'+r.id); if(!el) continue;
     let h='';
     for(const pid of r.photos){
-      try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); h+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){}
+      try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); h+=`<div class="thumb"><img src="${u}" onclick="viewPhotoEl(this)"></div>`; } }catch(e){}
     }
     el.innerHTML=h;
   }
 }
-function viewPhoto(u){ openModal(`<div style="text-align:center"><img src="${u}" style="max-width:100%;border-radius:12px"><button class="btn full" style="margin-top:14px" onclick="closeModal()">關閉</button></div>`); }
+let _galUrls=[], _galIdx=0, _galX=0;
+function viewPhotoEl(img){ const strip=img.closest('.photo-strip'); const imgs=strip?[...strip.querySelectorAll('img')]:[img]; _galUrls=imgs.map(x=>x.src); _galIdx=Math.max(0,imgs.indexOf(img)); openModal(galleryHtml()); }
+function viewPhoto(u){ _galUrls=[u]; _galIdx=0; openModal(galleryHtml()); }
+function galleryHtml(){
+  const u=_galUrls[_galIdx]||''; const multi=_galUrls.length>1;
+  return `<div style="text-align:center">
+    <div style="position:relative;display:inline-block;max-width:100%">
+      <img src="${u}" style="max-width:100%;max-height:68vh;border-radius:12px;display:block" ontouchstart="galTS(event)" ontouchend="galTE(event)">
+      ${multi?`<button class="gal-nav" style="left:6px" onclick="galMove(-1)">‹</button><button class="gal-nav" style="right:6px" onclick="galMove(1)">›</button>`:''}
+    </div>
+    ${multi?`<div class="muted" style="margin-top:8px">${_galIdx+1} / ${_galUrls.length}</div>`:''}
+    <button class="btn full" style="margin-top:12px" onclick="closeModal()">關閉</button>
+  </div>`;
+}
+function galMove(d){ if(_galUrls.length<2)return; _galIdx=(_galIdx+d+_galUrls.length)%_galUrls.length; document.getElementById('modalBox').innerHTML=galleryHtml(); }
+function galTS(e){ _galX=e.changedTouches[0].clientX; }
+function galTE(e){ const dx=e.changedTouches[0].clientX-_galX; if(Math.abs(dx)>40) galMove(dx<0?1:-1); }
 
 /* ===== 記錄／出勤 表單 ===== */
 let _logPhotos=[];       // 目前表單照片 [{id, blob?, url}]
@@ -893,7 +938,7 @@ function showRecordModal(){
     const itemsHtml=_rec.items.map((it,i)=>recItemRow(it,i)).join('');
     body=`${siteChips}<label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_rec.date)}" onchange="_rec.date=this.value"></label>
       <label class="fld"><span>施工廠商</span>
-        <div style="display:flex;gap:8px"><select class="inp" onchange="_rec.vendor=this.value">${vOpts}</select><button class="icon-btn" onclick="openVendorManage()" title="管理廠商">⚙</button></div>
+        <div style="display:flex;gap:8px"><select class="inp" onchange="_rec.vendor=this.value">${vOpts}</select><button class="btn ghost sm" onclick="openVendorManage()">編輯</button></div>
       </label>
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin:8px 2px 4px">施工項目</div>
       <div id="recItems">${itemsHtml}</div>
@@ -924,7 +969,7 @@ function toggleAttendSite(id,btn){ const i=_rec.attendSites.indexOf(id); if(i<0)
 /* 廠商管理（分案場） */
 function openVendorManage(){
   const list=vendorList();
-  openModal(`<h3>管理廠商（${esc(activeSite().name)}） <span class="x" onclick="showRecordModal()">×</span></h3>
+  openModal(`<h3>編輯廠商（${esc(activeSite().name)}） <span class="x" onclick="showRecordModal()">×</span></h3>
     <div class="muted" style="margin-bottom:10px">此案場的廠商清單，記錄時可下拉選。</div>
     ${list.map((v,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(v)}</div><button class="del" onclick="delVendor(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無廠商</div>'}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="vmNew" placeholder="新增廠商名稱"><button class="btn" onclick="addVendor()">新增</button></div>
@@ -1521,7 +1566,7 @@ function laborCard(l){
     <div style="margin-top:10px;display:flex;gap:8px"><button class="tbtn b" onclick="openLaborForm('${l.id}')">編輯</button><button class="tbtn r" onclick="delLabor('${l.id}')">刪除</button></div>
   </div>`;
 }
-async function loadLaborThumb(l){ const el=document.getElementById('lbph-'+l.id); if(!el)return; let html=''; for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); html+=`<div class="thumb"><img src="${u}" onclick="viewPhoto('${u}')"></div>`; } }catch(e){} } el.innerHTML=html; }
+async function loadLaborThumb(l){ const el=document.getElementById('lbph-'+l.id); if(!el)return; let html=''; for(const pid of lbPhotos(l)){ try{ const rec=await photoGet(pid); if(rec&&rec.blob){ const u=URL.createObjectURL(rec.blob); html+=`<div class="thumb"><img src="${u}" onclick="viewPhotoEl(this)"></div>`; } }catch(e){} } el.innerHTML=html; }
 function laborDayCard(l){
   return `<div class="log-card"><div class="lc-top"><div style="font-weight:700"><span class="tx-tag lab" style="margin-right:6px">點工</span>${esc(l.trade||'')}${l.count?' '+esc(String(l.count))+'名':''}</div><span class="muted" style="font-size:12px">在點工頁編輯</span></div>${l.source?`<div class="lc-meta">廠商：${esc(l.source)}</div>`:''}${l.reason?`<div style="margin-top:2px;font-size:14px">${esc(l.reason)}</div>`:''}</div>`;
 }
@@ -1540,7 +1585,7 @@ function openLaborForm(id){
 function tradeList(){ if(!state.laborTrades) state.laborTrades=LABOR_TRADES.slice(); return state.laborTrades; }
 function openTradeManage(){
   const list=tradeList();
-  openModal(`<h3>管理工種 <span class="x" onclick="showLaborModal()">×</span></h3>
+  openModal(`<h3>編輯工種 <span class="x" onclick="showLaborModal()">×</span></h3>
     <div class="muted" style="margin-bottom:10px">點工的工種清單（所有案場共用）。</div>
     ${list.map((t,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(t)}</div><button class="del" onclick="delTrade(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無工種</div>'}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="tradeNew" placeholder="新增工種名稱"><button class="btn" onclick="addTrade()">新增</button></div>
@@ -1554,7 +1599,7 @@ function showLaborModal(){
   openModal(`<h3>${_labor.editId?'編輯':'新增'}點工 <span class="x" onclick="closeModal()">×</span></h3>
     <label class="fld"><span>案場</span></label><div class="form-site-chips">${siteChips}</div>
     <label class="fld"><span>日期</span><input class="inp" type="date" value="${esc(_labor.date)}" onchange="_labor.date=this.value"></label>
-    <label class="fld"><span>工種</span><div style="display:flex;gap:8px"><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select><button class="icon-btn" onclick="openTradeManage()" title="管理工種">⚙</button></div></label>
+    <label class="fld"><span>工種</span><div style="display:flex;gap:8px"><select class="inp" onchange="_labor.trade=this.value">${tradeOpts}</select><button class="btn ghost sm" onclick="openTradeManage()">編輯</button></div></label>
     <div class="row">
       <label class="fld"><span>廠商</span><input class="inp" value="${esc(_labor.source)}" onchange="_labor.source=this.value" placeholder="例：阿明臨時工"></label>
       <label class="fld"><span>人數</span><input class="inp" type="number" inputmode="numeric" value="${_labor.count}" onchange="_labor.count=(this.value===''?'':+this.value)" placeholder="名"></label>
@@ -1600,7 +1645,7 @@ let _qr=null;
 function openQuickReport(){ _qr={ siteName:activeSite().name, location:'', sub:'', reason:(reasonList()[0]||''), desc:'', photos:[] }; showQuickReport(); }
 function openReasonManage(){
   const list=reasonList();
-  openModal(`<h3>管理事由 <span class="x" onclick="showQuickReport()">×</span></h3>
+  openModal(`<h3>編輯事由 <span class="x" onclick="showQuickReport()">×</span></h3>
     <div class="muted" style="margin-bottom:10px">現場阻礙的主要事由清單。</div>
     ${list.map((t,i)=>`<div class="mat-item" style="align-items:center"><div class="nm" style="flex:1">${esc(t)}</div><button class="del" onclick="delReason(${i})">🗑</button></div>`).join('')||'<div class="muted">尚無事由</div>'}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="reasonNew" placeholder="新增事由名稱"><button class="btn" onclick="addReason()">新增</button></div>
@@ -1620,7 +1665,7 @@ function showQuickReport(){
     <div class="form-site-chips">${siteChips}</div>
     <label class="fld"><span>位置</span><input class="inp" value="${esc(_qr.location)}" onchange="_qr.location=this.value" placeholder="例：C棟-16F"></label>
     <label class="fld"><span>會勘單位</span><input class="inp" value="${esc(_qr.sub)}" onchange="_qr.sub=this.value" placeholder="例：阿明木工"></label>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 4px"><span style="font-size:12px;font-weight:700;color:var(--text2)">主要事由</span><button class="btn ghost sm" onclick="openReasonManage()">⚙ 管理事由</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 4px"><span style="font-size:12px;font-weight:700;color:var(--text2)">主要事由</span><button class="btn ghost sm" onclick="openReasonManage()">編輯</button></div>
     <div class="item-pick" style="margin-bottom:12px">${reasonChips}</div>
     <label class="fld"><span>說明</span><textarea class="inp" onchange="_qr.desc=this.value" placeholder="例：4樓A區明天要灌漿，請木工配合退場">${esc(_qr.desc)}</textarea></label>
     <button class="btn green full" onclick="sendQuickReport()">LINE</button>`);
@@ -1670,12 +1715,12 @@ function renderProg(){
 }
 function floorPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgHistory('${p.id}')">${esc(p.floor||'?')} ${v}%</span>`; }
 function workPill(p){ const v=Math.max(0,Math.min(100,+p.percent||0)); const cls=v>=100?'done':(v>0?'active':'zero'); return `<span class="floor-pill ${cls}" onclick="openProgHistory('${p.id}')">${esc(p.work)} ${v}%</span>`; }
-function progSect(name, kind, avg, meta, collapsed, pillsHtml){
+function progSect(name, kind, avg, meta, collapsed, pillsHtml, badgeHtml){
   const caret=collapsed?'▶':'▼';
   return `<div class="prog-sect">
     <div class="ps-head" onclick="${kind}">
       <span class="ps-name">${esc(name)}</span>
-      <span class="ps-meta">${meta?esc(meta)+' ':''}<b>${avg}%</b> <span class="ps-caret">${caret}</span></span>
+      <span class="ps-meta">${meta?esc(meta)+' ':''}${badgeHtml||''}<b>${avg}%</b> <span class="ps-caret">${caret}</span></span>
     </div>
     <div class="thin-bar"><div class="thin-fill${avg>=100?' full':''}" style="width:${avg}%"></div></div>
     ${collapsed?'':`<div class="floor-pills">${pillsHtml}</div>`}
@@ -1689,7 +1734,10 @@ function progHtmlByWork(list){
     const avg=Math.round(g.reduce((t,p)=>t+(+p.percent||0),0)/g.length);
     const hc=headcountByWork(work);
     const meta=[vendorByWork(work), hc?hc+'人':''].filter(Boolean).join(' ');
-    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''));
+    let badge='';
+    const last=Math.max(0,...g.map(p=>{ const h=progHistory(p.id); return h.length?Date.parse(h[h.length-1].date):0; }));
+    if(last>0 && avg<100){ const days=Math.floor((Date.now()-last)/86400000); if(days>7) badge=`<span class="stall">停滯${days}天</span>`; }
+    return progSect(work||'(未命名)', `toggleWork('${esc(work)}')`, avg, meta, view.workCollapsed[work], g.map(floorPill).join(''), badge);
   }).join('');
 }
 function progHtmlByFloor(list){
