@@ -50,7 +50,8 @@ input,select,textarea{font-family:inherit; font-size:16px} /* 16px 防 iOS 放�
   width:36px; height:36px; border-radius:10px; background:var(--inp); border:1px solid var(--border);
   display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--blue); flex:none;
 }
-.icon-btn.report-btn{background:rgba(52,199,89,.16); border-color:rgba(52,199,89,.4)}
+.icon-btn.report-btn{background:rgba(52,199,89,.16); border-color:rgba(52,199,89,.4); color:var(--green)}
+.icon-btn svg{width:20px; height:20px; display:block}
 
 /* ===== 內容區 ===== */
 .screen{display:none; padding:14px; padding-bottom:calc(78px + var(--safe-b))}
@@ -376,9 +377,9 @@ textarea.inp{resize:vertical; min-height:60px}
   <div class="tb-row1">
     <div class="logo">泰郡<small>工務系統</small></div>
     <div style="display:flex;gap:6px">
-      <button class="icon-btn report-btn" onclick="openQuickReport()" title="現場阻礙">🚧</button>
-      <button class="icon-btn" onclick="openSiteManage()" title="管理案場">🏢</button>
-      <button class="icon-btn" onclick="openSettings()" title="設定／備份">⚙</button>
+      <button class="icon-btn report-btn" onclick="openQuickReport()" title="現場阻礙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></button>
+      <button class="icon-btn" onclick="openSiteManage()" title="管理案場"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8.5 7h1M14.5 7h1M8.5 11h1M14.5 11h1M8.5 15h1M14.5 15h1M10 21v-2.5h4V21"/></svg></button>
+      <button class="icon-btn" onclick="openSettings()" title="設定／備份"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2 6 6M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg></button>
     </div>
   </div>
   <div class="site-chips" id="siteChips"></div>

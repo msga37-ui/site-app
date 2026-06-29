@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>進度色比較</title>
+<style>
+:root{--card:#1c1c1e;--text:#f2f2f7;--text2:#98989f;--inp:#2c2c2e;--green:#34C759}
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:var(--text);font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;padding:18px 14px 40px}
+h1{font-size:18px;margin:4px 2px 4px}
+.note{color:var(--text2);font-size:13px;margin:0 2px 18px;line-height:1.6}
+.sw{background:var(--card);border-radius:16px;padding:16px 16px 18px;margin-bottom:14px}
+.sw .lab{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;margin-bottom:2px}
+.sw .hex{color:var(--text2);font-weight:600;font-size:12px}
+.sw .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-top:6px}
+.sw .vend{color:var(--text2);font-size:13px;flex:1}
+.sw .big{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.gbar{height:14px;border-radius:999px;background:var(--inp);overflow:hidden;margin-top:10px}
+.gfill{height:100%;border-radius:999px}
+.tline{display:flex;align-items:center;gap:10px;margin-top:14px}
+.tname{font-size:14px;font-weight:700;flex:none}
+.tpct{margin-left:auto;font-weight:800;font-size:15px}
+.tbar{flex:1;height:12px;border-radius:6px;background:var(--inp);overflow:hidden}
+.tfill{height:100%;border-radius:6px;width:80%}
+.pill{display:inline-block;margin-top:12px;font-size:13px;font-weight:700;padding:7px 13px;border-radius:999px;border:1.5px solid}
+.done{margin-left:8px;color:#1a8c3a;background:rgba(52,199,89,.18);border:1.5px solid transparent}
+</style>
+</head>
+<body>
+<h1>進度色比較</h1>
+<p class="note">每張卡是一種「進度色」的實際樣子（總進度條＋工項細條＋進行中膠囊）。完成狀態一律維持綠色。挑你看起來最舒服的，把<b>編號</b>告訴我即可。</p>
+<div id="list"></div>
+<script>
+const opts=[
+  ['1','iOS 藍（目前一般UI色）','#007AFF'],
+  ['2','靛藍 indigo','#5856D6'],
+  ['3','青綠 teal','#30B0C7'],
+  ['4','霧霾藍 dusty blue','#5E7CA3'],
+  ['5','鼠尾草綠 sage','#6FA287'],
+  ['6','灰藏青 slate','#42607C'],
+  ['7','暖琥珀 amber','#E0922F'],
+  ['8','洋紅（目前進度色，太搶）','#FF2D78'],
+];
+document.getElementById('list').innerHTML=opts.map(([n,name,c])=>`
+  <div class="sw">
+    <div class="lab"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${c}"></span>${n}. ${name} <span class="hex">${c}</span></div>
+    <div class="row">
+      <div class="vend">黑貓工程行 總出工29人</div>
+      <div class="big" style="color:${c}">90%</div>
+    </div>
+    <div class="gbar"><div class="gfill" style="width:90%;background:linear-gradient(90deg,${c}55,${c})"></div></div>
+    <div class="tline">
+      <span class="tname">隔間牆批土</span>
+      <span class="tbar"><span class="tfill" style="background:${c}"></span></span>
+      <span class="tpct" style="color:${c}">80%</span>
+    </div>
+    <div>
+      <span class="pill" style="color:${c};border-color:${c};background:${c}14">A棟4F 80%</span>
+      <span class="pill done">B6F ✓</span>
+    </div>
+  </div>`).join('');
+</script>
+</body>
+</html>
