@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="泰郡工務系統">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>
 :root{
   --blue:#007AFF; --green:#34C759; --orange:#FF9500; --red:#FF3B30; --purple:#AF52DE; --prog:#E08A0B;
@@ -1930,14 +1932,17 @@ async function importBackup(input){
 
 /* =================== PWA manifest（inline，免額外檔） =================== */
 function setupPWA(){
-  const icon='data:image/svg+xml,'+encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" rx="42" fill="#007AFF"/><text x="96" y="120" font-size="70" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="bold">泰郡</text></svg>`);
+  const base=location.origin+location.pathname.replace(/[^/]*$/,'');
+  const ic=s=>base+'icon-'+s+'.png';
   const manifest={ name:'泰郡工務系統', short_name:'泰郡工務', start_url:'.', display:'standalone',
-    background_color:'#f2f2f7', theme_color:'#007AFF',
-    icons:[{src:icon, sizes:'192x192', type:'image/svg+xml', purpose:'any'}] };
+    background_color:'#1a1a1a', theme_color:'#1a1a1a',
+    icons:[
+      {src:ic('192'), sizes:'192x192', type:'image/png', purpose:'any'},
+      {src:ic('512'), sizes:'512x512', type:'image/png', purpose:'any'},
+      {src:ic('512'), sizes:'512x512', type:'image/png', purpose:'maskable'}
+    ] };
   const url=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'}));
   const link=document.createElement('link'); link.rel='manifest'; link.href=url; document.head.appendChild(link);
-  const al=document.createElement('link'); al.rel='apple-touch-icon'; al.href=icon; document.head.appendChild(al);
 }
 
 /* =================== Service Worker（網路優先：自動更新 + 離線可用） =================== */
