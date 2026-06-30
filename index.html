@@ -91,6 +91,7 @@ textarea.inp{resize:vertical; min-height:60px}
 .stall{font-size:11px; font-weight:700; color:var(--red); background:rgba(255,59,48,.14); padding:2px 7px; border-radius:999px; margin-right:6px}
 .logsearch-bar{display:flex; align-items:center; gap:8px; width:100%; padding:11px 14px; border-radius:12px; background:var(--inp); border:1px solid var(--border); color:var(--text2); font-size:14px; font-weight:600; margin-bottom:12px}
 .btn.on-stall{background:rgba(255,59,48,.14); color:var(--red); border-color:transparent}
+.site-row{flex:1; text-align:left; background:none; border:none; color:var(--text); font-weight:600; font-size:14px; padding:6px 2px}
 .btn.sm{padding:7px 11px; font-size:13px; border-radius:9px}
 .btn.full{width:100%}
 .pill{display:inline-block; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
@@ -706,25 +707,30 @@ function switchSite(id){ state.activeSiteId=id; saveState(); renderAll(); }
 /* 管理案場（新增／改名／刪除 合一） */
 function openSiteManage(){
   const act=state.sites.filter(s=>!s.archived), arc=state.sites.filter(s=>s.archived);
-  const rowA=s=>`<div class="mat-item" style="align-items:center;gap:3px">
-      <div class="nm" style="flex:1">${esc(s.name)}${s.id===state.activeSiteId?' <small>（目前）</small>':''}</div>
+  const rowA=s=>`<div class="mat-item" style="align-items:center;gap:4px">
+      <button class="site-row" onclick="openSiteActions('${s.id}')">${esc(s.name)}${s.id===state.activeSiteId?' <small style="color:var(--text2)">（目前）</small>':''}<small style="color:var(--blue);margin-left:6px">編輯 ›</small></button>
       <button class="del" onclick="moveSite('${s.id}',-1)">▲</button>
       <button class="del" onclick="moveSite('${s.id}',1)">▼</button>
-      <button class="del" onclick="renameSitePrompt('${s.id}')">✎</button>
-      <button class="del" onclick="archiveSite('${s.id}',1)" title="封存">📥</button>
-      <button class="del" onclick="delSiteById('${s.id}')">🗑</button>
     </div>`;
-  const rowR=s=>`<div class="mat-item" style="align-items:center;opacity:.65">
-      <div class="nm" style="flex:1">${esc(s.name)}</div>
-      <button class="btn ghost sm" onclick="archiveSite('${s.id}',0)">取消封存</button>
-      <button class="del" onclick="delSiteById('${s.id}')">🗑</button>
+  const rowR=s=>`<div class="mat-item" style="align-items:center;opacity:.7">
+      <button class="site-row" onclick="openSiteActions('${s.id}')">${esc(s.name)}<small style="color:var(--blue);margin-left:6px">編輯 ›</small></button>
     </div>`;
   openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="muted" style="margin-bottom:10px">▲▼ 排序、✎ 改名、📥 封存、🗑 刪除。</div>
+    <div class="muted" style="margin-bottom:10px">▲▼ 排序；點案場名可改名／結案／刪除。</div>
     ${act.map(rowA).join('')}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="smNew" placeholder="新增案場名稱"><button class="btn" onclick="addSiteQuick()">新增</button></div>
-    ${arc.length?`<div class="set-sec">已封存（不顯示在上方）</div>${arc.map(rowR).join('')}`:''}
+    ${arc.length?`<div class="set-sec">已結案（不顯示在上方）</div>${arc.map(rowR).join('')}`:''}
     <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+}
+function openSiteActions(id){
+  const s=state.sites.find(x=>x.id===id); if(!s) return;
+  openModal(`<h3>${esc(s.name)} <span class="x" onclick="openSiteManage()">×</span></h3>
+    <button class="btn ghost full" style="margin-bottom:8px" onclick="renameSitePrompt('${id}')">改名</button>
+    ${s.archived
+      ? `<button class="btn ghost full" style="margin-bottom:8px" onclick="archiveSite('${id}',0)">取消結案（移回上方）</button>`
+      : `<button class="btn ghost full" style="margin-bottom:8px" onclick="archiveSite('${id}',1)">結案（從上方收起，資料保留）</button>`}
+    <button class="btn red full" style="margin-bottom:8px" onclick="delSiteById('${id}')">刪除案場</button>
+    <button class="btn ghost full" onclick="openSiteManage()">返回</button>`);
 }
 function moveSite(id,dir){
   const act=state.sites.filter(s=>!s.archived); const i=act.findIndex(x=>x.id===id), j=i+dir;
@@ -736,7 +742,7 @@ function moveSite(id,dir){
 function archiveSite(id,on){
   const s=state.sites.find(x=>x.id===id); if(!s) return;
   if(on){
-    if(state.sites.filter(x=>!x.archived).length<=1) return toast('至少要保留一個未封存案場');
+    if(state.sites.filter(x=>!x.archived).length<=1) return toast('至少要保留一個進行中案場');
     s.archived=true;
     if(state.activeSiteId===id){ const f=state.sites.find(x=>!x.archived); if(f) state.activeSiteId=f.id; }
   } else { s.archived=false; }

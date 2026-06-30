@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>App 圖示比較</title>
+<title>App 圖示比較（雙色幾何）</title>
 <style>
 :root{--text:#f2f2f7;--text2:#98989f;--card:#1c1c1e}
 *{box-sizing:border-box}
@@ -18,23 +18,21 @@ h1{font-size:18px;margin:4px 2px 4px}
 </style>
 </head>
 <body>
-<h1>App 圖示比較（「泰」字）</h1>
-<p class="note">這是加到主畫面後圖示的實際樣子（已套用 iOS 圓角）。挑你最喜歡的，把<b>編號</b>給我，我就設成正式圖示＋啟動畫面。</p>
+<h1>App 圖示（雙色幾何・「泰」字）</h1>
+<p class="note">背景斜切兩色＋泰字，比純色更有設計感。這是加到主畫面的實際樣子（已套 iOS 圓角）。挑你最喜歡的，把<b>編號</b>給我即可。</p>
 <div class="grid" id="g"></div>
 <script>
 const opts=[
-  ['1','琥珀底白字','跟 App 主色一致'],
-  ['2','深藍底白字','沉穩專業'],
-  ['3','深藍底琥珀字','深藍＋琥珀撞色'],
-  ['4','黑底琥珀字','低調質感'],
-  ['5','琥珀漸層白字','有層次'],
-  ['6','磚紅底白字','工程/土地感'],
-  ['7','森林綠底白字','穩重自然'],
-  ['8','白底琥珀字','乾淨明亮'],
+  ['1','深藍 × 琥珀','沉穩＋主色，最百搭'],
+  ['2','黑 × 琥珀','低調有質感'],
+  ['3','磚紅 × 琥珀','工程／土地暖調'],
+  ['4','深藍 × 青','冷色現代'],
+  ['5','森林綠 × 琥珀','穩重自然'],
+  ['6','深紫 × 琥珀','個性'],
 ];
 document.getElementById('g').innerHTML=opts.map(([n,name,d])=>`
   <div class="cell">
-    <img src="prev-ic-${n}.png?v=1" alt="${name}">
+    <img src="prev-g-${n}.png?v=1" alt="${name}">
     <div class="n">${n}. ${name}</div>
     <div class="d">${d}</div>
   </div>`).join('');
