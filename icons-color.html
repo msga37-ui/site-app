@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>App 圖示比較</title>
+<style>
+:root{--text:#f2f2f7;--text2:#98989f;--card:#1c1c1e}
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:var(--text);font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;padding:18px 14px 50px}
+h1{font-size:18px;margin:4px 2px 4px}
+.note{color:var(--text2);font-size:13px;margin:0 2px 18px;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.cell{background:var(--card);border-radius:16px;padding:16px;text-align:center}
+.cell img{width:104px;height:104px;border-radius:23px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.cell .n{font-weight:800;font-size:15px;margin-top:10px}
+.cell .d{color:var(--text2);font-size:12px;margin-top:2px}
+</style>
+</head>
+<body>
+<h1>App 圖示比較（「泰」字）</h1>
+<p class="note">這是加到主畫面後圖示的實際樣子（已套用 iOS 圓角）。挑你最喜歡的，把<b>編號</b>給我，我就設成正式圖示＋啟動畫面。</p>
+<div class="grid" id="g"></div>
+<script>
+const opts=[
+  ['1','琥珀底白字','跟 App 主色一致'],
+  ['2','深藍底白字','沉穩專業'],
+  ['3','深藍底琥珀字','深藍＋琥珀撞色'],
+  ['4','黑底琥珀字','低調質感'],
+  ['5','琥珀漸層白字','有層次'],
+  ['6','磚紅底白字','工程/土地感'],
+  ['7','森林綠底白字','穩重自然'],
+  ['8','白底琥珀字','乾淨明亮'],
+];
+document.getElementById('g').innerHTML=opts.map(([n,name,d])=>`
+  <div class="cell">
+    <img src="prev-ic-${n}.png?v=1" alt="${name}">
+    <div class="n">${n}. ${name}</div>
+    <div class="d">${d}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

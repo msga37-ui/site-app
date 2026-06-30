@@ -700,20 +700,47 @@ function closeModal(){ document.getElementById('modalBg').classList.remove('show
 /* =================== 案場 =================== */
 function renderSiteChips(){
   const el=document.getElementById('siteChips');
-  el.innerHTML=state.sites.map(s=>`<button class="site-chip${s.id===state.activeSiteId?' on':''}" onclick="switchSite('${s.id}')">${esc(s.name)}</button>`).join('');
+  el.innerHTML=state.sites.filter(s=>!s.archived).map(s=>`<button class="site-chip${s.id===state.activeSiteId?' on':''}" onclick="switchSite('${s.id}')">${esc(s.name)}</button>`).join('');
 }
 function switchSite(id){ state.activeSiteId=id; saveState(); renderAll(); }
 /* 管理案場（新增／改名／刪除 合一） */
 function openSiteManage(){
-  openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="muted" style="margin-bottom:10px">可新增、改名或刪除案場。</div>
-    ${state.sites.map(s=>`<div class="mat-item" style="align-items:center">
+  const act=state.sites.filter(s=>!s.archived), arc=state.sites.filter(s=>s.archived);
+  const rowA=s=>`<div class="mat-item" style="align-items:center;gap:3px">
       <div class="nm" style="flex:1">${esc(s.name)}${s.id===state.activeSiteId?' <small>（目前）</small>':''}</div>
+      <button class="del" onclick="moveSite('${s.id}',-1)">▲</button>
+      <button class="del" onclick="moveSite('${s.id}',1)">▼</button>
       <button class="del" onclick="renameSitePrompt('${s.id}')">✎</button>
+      <button class="del" onclick="archiveSite('${s.id}',1)" title="封存">📥</button>
       <button class="del" onclick="delSiteById('${s.id}')">🗑</button>
-    </div>`).join('')}
+    </div>`;
+  const rowR=s=>`<div class="mat-item" style="align-items:center;opacity:.65">
+      <div class="nm" style="flex:1">${esc(s.name)}</div>
+      <button class="btn ghost sm" onclick="archiveSite('${s.id}',0)">取消封存</button>
+      <button class="del" onclick="delSiteById('${s.id}')">🗑</button>
+    </div>`;
+  openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
+    <div class="muted" style="margin-bottom:10px">▲▼ 排序、✎ 改名、📥 封存、🗑 刪除。</div>
+    ${act.map(rowA).join('')}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="smNew" placeholder="新增案場名稱"><button class="btn" onclick="addSiteQuick()">新增</button></div>
+    ${arc.length?`<div class="set-sec">已封存（不顯示在上方）</div>${arc.map(rowR).join('')}`:''}
     <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+}
+function moveSite(id,dir){
+  const act=state.sites.filter(s=>!s.archived); const i=act.findIndex(x=>x.id===id), j=i+dir;
+  if(i<0||j<0||j>=act.length) return;
+  [act[i],act[j]]=[act[j],act[i]];
+  state.sites=[...act, ...state.sites.filter(s=>s.archived)];
+  saveState(); renderSiteChips(); openSiteManage();
+}
+function archiveSite(id,on){
+  const s=state.sites.find(x=>x.id===id); if(!s) return;
+  if(on){
+    if(state.sites.filter(x=>!x.archived).length<=1) return toast('至少要保留一個未封存案場');
+    s.archived=true;
+    if(state.activeSiteId===id){ const f=state.sites.find(x=>!x.archived); if(f) state.activeSiteId=f.id; }
+  } else { s.archived=false; }
+  saveState(); renderAll(); openSiteManage();
 }
 function addSiteQuick(){
   const n=(document.getElementById('smNew').value||'').trim(); if(!n) return toast('請輸入名稱');
@@ -732,7 +759,7 @@ function delSiteById(id){
   delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
   ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
   state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
-  if(state.activeSiteId===id) state.activeSiteId=state.sites[0].id;
+  if(state.activeSiteId===id) state.activeSiteId=(state.sites.find(x=>!x.archived)||state.sites[0]).id;
   saveState(); renderAll(); openSiteManage();
 }
 
