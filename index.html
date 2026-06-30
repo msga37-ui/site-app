@@ -707,33 +707,26 @@ function renderSiteChips(){
 }
 function switchSite(id){ state.activeSiteId=id; saveState(); renderAll(); }
 /* 管理案場（新增／改名／刪除 合一） */
+let _siteEdit=false;
 function openSiteManage(){
-  const act=state.sites.filter(s=>!s.archived), arc=state.sites.filter(s=>s.archived);
-  const rowA=s=>`<div class="mat-item" style="align-items:center;gap:4px">
-      <button class="site-row" onclick="openSiteActions('${s.id}')">${esc(s.name)}${s.id===state.activeSiteId?' <small style="color:var(--text2)">（目前）</small>':''}<small style="color:var(--blue);margin-left:6px">編輯 ›</small></button>
-      <button class="del" onclick="moveSite('${s.id}',-1)">▲</button>
-      <button class="del" onclick="moveSite('${s.id}',1)">▼</button>
-    </div>`;
-  const rowR=s=>`<div class="mat-item" style="align-items:center;opacity:.7">
-      <button class="site-row" onclick="openSiteActions('${s.id}')">${esc(s.name)}<small style="color:var(--blue);margin-left:6px">編輯 ›</small></button>
-    </div>`;
-  openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeModal()">×</span></h3>
-    <div class="muted" style="margin-bottom:10px">▲▼ 排序；點案場名可改名／結案／刪除。</div>
+  const act=state.sites.filter(s=>!s.archived), arc=state.sites.filter(s=>s.archived), ed=_siteEdit;
+  const nameCell=(s,cur)=> ed
+    ? `<button class="site-row" onclick="renameSitePrompt('${s.id}')">${esc(s.name)}${cur?' <small style="color:var(--text2)">（目前）</small>':''} <small style="color:var(--blue)">改名 ›</small></button>`
+    : `<div class="nm" style="flex:1">${esc(s.name)}${cur?' <small style="color:var(--text2)">（目前）</small>':''}</div>`;
+  const rowA=s=>`<div class="mat-item" style="align-items:center;gap:4px">${nameCell(s,s.id===state.activeSiteId)}${ed?`<button class="del" onclick="moveSite('${s.id}',-1)">▲</button><button class="del" onclick="moveSite('${s.id}',1)">▼</button><button class="btn ghost sm" style="padding:5px 9px;color:var(--prog)" onclick="archiveSite('${s.id}',1)">結案</button><button class="del" style="color:var(--red)" onclick="delSiteById('${s.id}')">🗑</button>`:''}</div>`;
+  const rowR=s=>`<div class="mat-item" style="align-items:center;gap:4px;opacity:.75"><div class="nm" style="flex:1">${esc(s.name)}</div>${ed?`<button class="btn ghost sm" onclick="archiveSite('${s.id}',0)">取消結案</button><button class="del" style="color:var(--red)" onclick="delSiteById('${s.id}')">🗑</button>`:''}</div>`;
+  openModal(`<h3>🏢 管理案場 <span class="x" onclick="closeSiteManage()">×</span></h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+      <span class="muted" style="font-size:13px">${ed?'點名稱改名；▲▼ 排序、結案、🗑 刪除':'按「編輯」可排序／改名／結案／刪除'}</span>
+      <button class="btn ghost sm" style="flex:none" onclick="toggleSiteEdit()">${ed?'完成':'編輯'}</button>
+    </div>
     ${act.map(rowA).join('')}
     <div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="smNew" placeholder="新增案場名稱"><button class="btn" onclick="addSiteQuick()">新增</button></div>
     ${arc.length?`<div class="set-sec">已結案（不顯示在上方）</div>${arc.map(rowR).join('')}`:''}
-    <button class="btn ghost full" style="margin-top:14px" onclick="closeModal()">完成</button>`);
+    <button class="btn ghost full" style="margin-top:14px" onclick="closeSiteManage()">完成</button>`);
 }
-function openSiteActions(id){
-  const s=state.sites.find(x=>x.id===id); if(!s) return;
-  openModal(`<h3>${esc(s.name)} <span class="x" onclick="openSiteManage()">×</span></h3>
-    <button class="btn ghost full" style="margin-bottom:8px" onclick="renameSitePrompt('${id}')">改名</button>
-    ${s.archived
-      ? `<button class="btn ghost full" style="margin-bottom:8px" onclick="archiveSite('${id}',0)">取消結案（移回上方）</button>`
-      : `<button class="btn ghost full" style="margin-bottom:8px" onclick="archiveSite('${id}',1)">結案（從上方收起，資料保留）</button>`}
-    <button class="btn red full" style="margin-bottom:8px" onclick="delSiteById('${id}')">刪除案場</button>
-    <button class="btn ghost full" onclick="openSiteManage()">返回</button>`);
-}
+function toggleSiteEdit(){ _siteEdit=!_siteEdit; openSiteManage(); }
+function closeSiteManage(){ _siteEdit=false; closeModal(); }
 function moveSite(id,dir){
   const act=state.sites.filter(s=>!s.archived); const i=act.findIndex(x=>x.id===id), j=i+dir;
   if(i<0||j<0||j>=act.length) return;
