@@ -782,6 +782,11 @@ function delSiteById(id){
   if(state.sites.length<=1) return toast('至少需保留一個案場');
   const s=state.sites.find(x=>x.id===id);
   if(!confirm('確定刪除「'+(s?s.name:'')+'」？該案場的日誌、進度、材料、照片等資料會一併移除，無法復原。')) return;
+  const pids=[];
+  ((state.records||{})[id]||[]).forEach(r=>(r.photos||[]).forEach(p=>pids.push(p)));
+  ((state.labor||{})[id]||[]).forEach(l=>{ (l.photoIds||(l.photoId?[l.photoId]:[])).forEach(p=>pids.push(p)); });
+  ((state.photoRecs||{})[id]||[]).forEach(r=>{ if(r.photoId)pids.push(r.photoId); });
+  pids.forEach(p=>photoDel(p).catch(()=>{}));
   state.sites=state.sites.filter(x=>x.id!==id);
   delete state.materials[id]; delete state.records[id]; delete state.progress[id]; delete state.vendors[id];
   ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
@@ -1945,6 +1950,7 @@ async function importBackup(input){
   if(!confirm('還原會「覆蓋」目前 App 內的所有資料，確定要還原嗎？')) return;
   state=migrateState(backup.state); saveState();
   if(!state.sites.find(s=>s.id===state.activeSiteId)) state.activeSiteId=state.sites[0].id;
+  try{ const olds=await photoGetAll(); for(const p of olds){ await photoDel(p.id).catch(()=>{}); } }catch(e){}
   if(backup.photos && backup.photos.length){
     toast('正在還原照片…');
     for(const p of backup.photos){ try{ if(p.data) await photoPut(p.id, dataURLtoBlob(p.data), p.meta||{}); }catch(e){} }
