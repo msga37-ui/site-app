@@ -696,6 +696,7 @@ function vendorList(){ if(!state.vendors) state.vendors={}; const sid=state.acti
 function recStore(){ if(!state.records) state.records={}; const sid=state.activeSiteId; if(!state.records[sid]) state.records[sid]=[]; return state.records[sid]; }
 function progStore(){ if(!state.progress) state.progress={}; const sid=state.activeSiteId; if(!state.progress[sid]) state.progress[sid]=[]; return state.progress[sid]; }
 function progById(id){ return progStore().find(p=>p.id===id); }
+function itPct(it,p){ return it.percent!=null ? Math.max(0,Math.min(100,+it.percent||0)) : (+((p||{}).percent)||0); }
 function upsertProgress(work, floor, vendor){ const list=progStore(); let p=list.find(x=>x.work===work && x.floor===floor); if(!p){ p={id:uid(), work, floor, percent:0, vendor:vendor||''}; list.push(p); } else if(vendor){ p.vendor=vendor; } return p; }
 
 /* =================== IndexedDB 照片 store（foundation，供之後模組使用） =================== */
@@ -881,8 +882,8 @@ function renderDay(){
 function recordCard(r){
   const items=(r.items||[]).map(it=>{
     const p=progById(it.progressId); if(!p) return '';
-    const done=(+p.percent||0)>=100;
-    return `<div class="rc-line"><span class="cdot" style="background:${COLOR_HEX[workColor(p.work)]}"></span><b>${esc(p.work||'-')}</b> <span class="muted">${esc(p.floor||'')}</span>${it.headcount?` <span class="rc-hc">${it.headcount}人</span>`:''} <span class="rc-pct${done?' done':''}">${done?'✓':(p.percent||0)+'%'}</span></div>`;
+    const v=itPct(it,p); const done=v>=100;
+    return `<div class="rc-line"><span class="cdot" style="background:${COLOR_HEX[workColor(p.work)]}"></span><b>${esc(p.work||'-')}</b> <span class="muted">${esc(p.floor||'')}</span>${it.headcount?` <span class="rc-hc">${it.headcount}人</span>`:''} <span class="rc-pct${done?' done':''}">${done?'✓':v+'%'}</span></div>`;
   }).join('');
   const photoStrip=(r.photos&&r.photos.length)?`<div class="photo-strip" id="ph-${r.id}"></div>`:'';
   return `<div class="log-card">
@@ -1095,7 +1096,7 @@ function delAttend(id){ if(!confirm('刪除此筆出勤？'))return; state.atten
 
 /* LINE 分享（記錄） */
 function recordLineText(r){
-  const lines=(r.items||[]).map(it=>{ const p=progById(it.progressId); if(!p)return ''; const done=(+p.percent||0)>=100; return `・${p.work} ${p.floor||''} ${it.headcount?it.headcount+'人 ':''}${done?'✓完成':(p.percent||0)+'%'}`; }).filter(Boolean).join('\n');
+  const lines=(r.items||[]).map(it=>{ const p=progById(it.progressId); if(!p)return ''; const v=itPct(it,p); const done=v>=100; return `・${p.work} ${p.floor||''} ${it.headcount?it.headcount+'人 ':''}${done?'✓完成':v+'%'}`; }).filter(Boolean).join('\n');
   return `【案場】${activeSite().name}\n【日期】${r.date}\n【廠商】${r.vendor||'-'}\n【施工項目】\n${lines}${r.note?'\n【備註】'+r.note:''}`;
 }
 async function shareRecord(id){
@@ -1123,7 +1124,7 @@ function dayShareText(date, reason){
     out+='\n\n【施工】';
     recs.forEach(r=>{
       out+='\n〔'+(r.vendor||'未填廠商')+'〕';
-      (r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(!p)return; const done=(+p.percent||0)>=100; const parts=[p.work]; if(p.floor)parts.push(p.floor); if(it.headcount)parts.push(it.headcount+'人'); parts.push(done?'✓完成':(p.percent||0)+'%'); out+='\n・'+parts.join(' '); });
+      (r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(!p)return; const v=itPct(it,p); const done=v>=100; const parts=[p.work]; if(p.floor)parts.push(p.floor); if(it.headcount)parts.push(it.headcount+'人'); parts.push(done?'✓完成':v+'%'); out+='\n・'+parts.join(' '); });
       if(r.note) out+='\n備註：'+r.note;
     });
   }
@@ -1898,7 +1899,7 @@ function exportCSV(){
   L.push(csvEsc(site.name+' '+ym+' 匯出')); L.push('');
   L.push('施工記錄'); row(['日期','廠商','工項','樓層','人數','進度%']);
   ((state.records||{})[sid]||[]).filter(r=>inMonth(r.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(r=>{
-    (r.items||[]).forEach(it=>{ const p=((state.progress||{})[sid]||[]).find(x=>x.id===it.progressId)||{}; row([r.date, r.vendor, p.work||'', p.floor||'', it.headcount===0?0:(it.headcount||''), p.percent||0]); });
+    (r.items||[]).forEach(it=>{ const p=((state.progress||{})[sid]||[]).find(x=>x.id===it.progressId)||{}; row([r.date, r.vendor, p.work||'', p.floor||'', it.headcount===0?0:(it.headcount||''), itPct(it,p)]); });
   });
   L.push('');
   L.push('點工'); row(['日期','工種','廠商','人數','工作內容']);
