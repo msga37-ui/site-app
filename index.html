@@ -305,9 +305,6 @@ textarea.inp{resize:vertical; min-height:60px}
 .seg{display:flex; background:var(--inp); border-radius:10px; padding:3px; margin-bottom:12px}
 .seg button{flex:1; padding:9px; border-radius:8px; font-weight:700; font-size:14px; color:var(--text2)}
 .seg button.on{background:var(--card); color:var(--text); box-shadow:var(--shadow)}
-.result-row{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid var(--border)}
-.result-row .rv{font-weight:800; font-size:16px}
-.result-row .rv small{font-weight:600; color:var(--text2); font-size:12px; margin-left:3px}
 .warn{
   background:rgba(222,124,10,.12); border:1px solid rgba(222,124,10,.4); color:#9A5A08;
   border-radius:12px; padding:12px; font-size:13.5px; line-height:1.5; margin-top:12px; font-weight:600;
@@ -541,8 +538,6 @@ body.dark .warn{color:#F0A94A}
 
 <script>
 /* =================== 常數 =================== */
-const PING = 3.305785;             // 1 坪 = 3.305785 m²
-const BOARD_AREA = 1.674;          // 3'×6' 板材 ≈ 1.674 m²（參考既有 KEY_WIDTHS）
 
 // 13 項施工項目 → 顏色分類（隔間=藍 / 天花=橘 / 批土其他=紅）
 const LOG_ITEMS = [
@@ -603,28 +598,6 @@ const MAT_CATS = [
 const MAT_DEF = {};
 MAT_CATS.forEach(c=>c.items.forEach(it=>{ MAT_DEF[it.name]={...it, cat:c.key}; }));
 
-// 算料工法 → 預設係數（每坪數量，可編輯；預設僅供參考，請依實際叫貨微調）
-const DEFAULT_COEFFS = {
-  part_single:{label:'輕隔間牆(單面封板)', mats:[
-    {name:'立柱',unit:'支',c:1.2},{name:'上下槽',unit:'支',c:0.9},
-    {name:'矽酸鈣板',unit:'片',c:2.1},{name:'岩棉',unit:'包',c:0.35},
-    {name:'水泥',unit:'包',c:0},{name:'保麗龍',unit:'包',c:0},
-  ]},
-  part_double:{label:'輕隔間牆(雙面封板)', mats:[
-    {name:'立柱',unit:'支',c:1.2},{name:'上下槽',unit:'支',c:0.9},
-    {name:'矽酸鈣板',unit:'片',c:4.0},{name:'岩棉',unit:'包',c:0.4},
-    {name:'水泥',unit:'包',c:0},{name:'保麗龍',unit:'包',c:0},
-  ]},
-  ceil_dark:{label:'暗架天花板', mats:[
-    {name:'吊筋',unit:'支',c:1.0},{name:'大百葉',unit:'支',c:0.9},{name:'蜈蚣腳',unit:'支',c:1.6},
-    {name:'收邊',unit:'支',c:0.6},{name:'矽酸鈣板',unit:'片',c:2.1},
-  ]},
-  ceil_bright:{label:'明架天花板', warn:true, mats:[
-    {name:'大T',unit:'支',c:0.9},{name:'小T',unit:'支',c:1.6},{name:'收邊',unit:'支',c:0.6},
-    {name:'吊筋',unit:'支',c:1.0},{name:'明架天花板',unit:'箱',c:0.6},
-  ]},
-};
-const BRIGHT_WARN = '⚠️ 提示：明架落料單純置入骨架內即可，單價與工法計算中，切勿重複計入「批土/補土膏」與接縫紙帶成本。';
 
 /* =================== 狀態 =================== */
 function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
@@ -633,14 +606,14 @@ function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(
 function weekdayTW(ds){ const p=String(ds).split('-'); const d=new Date(+p[0],(+p[1]||1)-1,+p[2]||1); return '日一二三四五六'[d.getDay()]; }
 
 let state = loadState();
-let view = { tab:'log', calcMode:'area', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', progStallOnly:false, workCollapsed:{}, floorCollapsed:{},
+let view = { tab:'log', matCat:null, matMode:'list', matEdit:false, progView:'work', progFilter:'', progStallOnly:false, workCollapsed:{}, floorCollapsed:{},
   calMonth:(new Date()).getMonth(), calYear:(new Date()).getFullYear(), selDate:todayStr() };
 
 function defaultState(){
   const sid = uid();
   return { sites:[{id:sid, name:'案場一'}], activeSiteId:sid,
     records:{}, progress:{}, attendance:[], vendors:{}, workItems:LOG_ITEMS.slice(),
-    materials:{}, calcCoeffs:null };
+    materials:{} };
 }
 function loadState(){
   let s=null;
@@ -691,7 +664,6 @@ function migrateState(s){
 }
 function saveState(){ try{ localStorage.setItem('wm_state', JSON.stringify(state)); markChanged(); }catch(e){ toast('⚠️ 儲存失敗（空間不足），請立即到設定備份資料'); } }
 function activeSite(){ return state.sites.find(s=>s.id===state.activeSiteId) || state.sites[0]; }
-function getCoeffs(){ return state.calcCoeffs || DEFAULT_COEFFS; }
 function markChanged(){ try{ localStorage.setItem('wm_lastChange', Date.now()); }catch(e){} }
 /* ---- 批次A 資料 helper ---- */
 function workList(){ if(!state.workItems) state.workItems=LOG_ITEMS.slice(); return state.workItems; }
@@ -927,7 +899,6 @@ async function loadCardThumbs(recs){
 }
 let _galUrls=[], _galIdx=0, _galX=0;
 function viewPhotoEl(img){ const strip=img.closest('.photo-strip'); const imgs=strip?[...strip.querySelectorAll('img')]:[img]; _galUrls=imgs.map(x=>x.src); _galIdx=Math.max(0,imgs.indexOf(img)); openModal(galleryHtml()); }
-function viewPhoto(u){ _galUrls=[u]; _galIdx=0; openModal(galleryHtml()); }
 function galleryHtml(){
   const u=_galUrls[_galIdx]||''; const multi=_galUrls.length>1;
   return `<div style="text-align:center">
@@ -1275,7 +1246,6 @@ function matPointerInit(){
 }
 
 function toggleMatEdit(){ view.matEdit=!view.matEdit; const b=document.getElementById('matEditBtn'); if(b){ b.textContent=view.matEdit?'完成':'✎ 編輯'; b.classList.toggle('green',view.matEdit); } renderMat(); }
-function itemOrderedTotal(name){ const it=matStore().items[name]; if(!it)return 0; return f2((it.specs||[]).reduce((t,s)=>t+(+s.ordered||0),0)); }
 function matCleanRow(name){
   const def=getMatDef(name); const has=itemTxs(name).length>0; const bal=f2(itemBalance(name));
   const right = has ? ('剩 '+bal+(def.unit||'')) : '<span class="mr-empty">記進料/已用</span>';
@@ -1372,16 +1342,6 @@ function saveTx(name, editId){
   view.selDate=date; saveState(); openMatDetail(name); toast(editId?'已修改':'已記'+txLabel(type));
 }
 function delTx(id, name){ if(!confirm('刪除此筆紀錄？'))return; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.id!==id); saveState(); openMatDetail(name); }
-function addSpec(name,label){ const it=matItem(name); it.specs.push({id:uid(),label:label||'',ordered:'',actual:'',checked:false}); saveState(); afterMatChange(); }
-function delSpec(name,sid){ const it=matStore().items[name]; if(!it)return; it.specs=it.specs.filter(s=>s.id!==sid); saveState(); afterMatChange(); }
-function setSpec(name,sid,field,v){
-  const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(!s)return;
-  if(field==='label'){ s.label=v; }
-  else { s[field]=(v===''?'':(parseFloat(v)||0)); if(field==='actual'&&v!=='') s.checked=true; }
-  saveState(); afterMatChange();
-}
-function setPerBox(name,v){ const def=getMatDef(name); if(def) def.perBox=parseFloat(v)||0; saveState(); afterMatChange(); }
-function toggleSpecChk(name,sid){ const it=matItem(name); const s=it.specs.find(x=>x.id===sid); if(s){ s.checked=!s.checked; saveState(); afterMatChange(); } }
 
 /* ===== 購物車下單 / 材料訂單 ===== */
 function ordStore(){ if(!state.orders)state.orders={}; const sid=state.activeSiteId; if(!state.orders[sid])state.orders[sid]=[]; return state.orders[sid]; }
@@ -1749,7 +1709,6 @@ async function sendQuickReport(){
 }
 
 /* =================== 工項進度（雙檢視，資料來自記錄；亦可直接編輯） =================== */
-function totalHeadcount(){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>t+=(+it.headcount||0))); return Math.round(t*10)/10; }
 function headcountByWork(work){ let t=0; recStore().forEach(r=>(r.items||[]).forEach(it=>{ const p=progById(it.progressId); if(p&&p.work===work)t+=(+it.headcount||0); })); return Math.round(t*10)/10; }
 function vendorByWork(work){ const set=new Set(); progStore().forEach(p=>{ if(p.work===work&&p.vendor)set.add(p.vendor); }); return [...set].join('、'); }
 function vendorHeadcounts(){ const map={}, order=[]; recStore().forEach(r=>{ const k=r.vendor||'(未填廠商)'; (r.items||[]).forEach(it=>{ if(!(k in map)){map[k]=0;order.push(k);} map[k]+=(+it.headcount||0); }); }); return {map,order}; }
