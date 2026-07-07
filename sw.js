@@ -1,6 +1,6 @@
 /* 泰郡工務系統 Service Worker — 網路優先(network-first)
    線上：永遠抓最新版（HTML 加時間戳繞過 CDN 快取）；離線：用快取讓工地沒訊號也能開。 */
-const CACHE = 'wm-cache-v2';
+const CACHE = 'wm-cache-v3';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -15,6 +15,14 @@ self.addEventListener('activate', e => {
   );
 });
 
+function cacheIfOk(key, res) {
+  if (res.ok || res.type === 'opaque') {
+    const copy = res.clone();
+    caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {});
+  }
+  return res;
+}
+
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -24,14 +32,14 @@ self.addEventListener('fetch', e => {
     const fresh = req.url + (req.url.includes('?') ? '&' : '?') + '_sw=' + Date.now();
     e.respondWith(
       fetch(fresh, { cache: 'no-store' })
-        .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./', copy)).catch(() => {}); return res; })
+        .then(res => cacheIfOk('./', res))
         .catch(() => caches.match('./').then(r => r || caches.match(req)))
     );
     return;
   }
   e.respondWith(
     fetch(req)
-      .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return res; })
+      .then(res => cacheIfOk(req, res))
       .catch(() => caches.match(req).then(r => r || caches.match('./')))
   );
 });
