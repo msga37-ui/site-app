@@ -191,6 +191,9 @@ textarea.inp{resize:vertical; min-height:60px}
 .sum-nums{font-size:13px; color:var(--text2); white-space:nowrap}
 .sum-nums b{color:var(--blue); font-size:15px}
 .sum-nums small{color:var(--text2); margin-left:2px}
+.sum-item{font-weight:700; font-size:14px; color:var(--text); padding:10px 4px 2px}
+.sum-row.sum-spec{padding-left:16px}
+.sum-row.sum-spec .sum-name{font-weight:500}
 .mat-item{display:flex; align-items:flex-start; gap:10px; padding:11px 4px; border-bottom:1px solid var(--border)}
 .mat-item .nm{font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
 .mat-item .nm small{color:var(--text2); font-weight:500; font-size:12px}
@@ -1214,7 +1217,7 @@ function addCatPrompt(){ openModal(`<h3>新增分類 <span class="x" onclick="cl
 function addCat(){ const n=(document.getElementById('catName').value||'').trim(); if(!n)return toast('請輸入名稱'); const cats=catalogStore(); if(cats.some(c=>c.name===n))return toast('已有同名分類'); const c={id:uid(),name:n,items:[]}; cats.push(c); view.matCat=c.id; saveState(); closeModal(); renderMat(); }
 function renameCatPrompt(id){ const c=catalogStore().find(x=>x.id===id); if(!c)return; openModal(`<h3>分類改名 <span class="x" onclick="closeModal()">×</span></h3><label class="fld"><span>分類名稱</span><input class="inp" id="catName" value="${esc(c.name)}"></label><button class="btn full" onclick="renameCat('${id}')">儲存</button>`); }
 function renameCat(id){ const n=(document.getElementById('catName').value||'').trim(); if(!n)return toast('請輸入名稱'); const c=catalogStore().find(x=>x.id===id); if(c)c.name=n; saveState(); closeModal(); renderMat(); }
-function delCat(id){ const cats=catalogStore(); const c=cats.find(x=>x.id===id); if(!c)return; if(!confirm('刪除分類「'+c.name+'」？底下所有品項與已填數量都會移除。'))return; const m=matStore(); c.items.forEach(it=>{ delete m.items[it.name]; }); const names=new Set(c.items.map(it=>it.name)); state.matTx[state.activeSiteId]=matTxStore().filter(t=>!names.has(t.item)); state.catalog[state.activeSiteId]=cats.filter(x=>x.id!==id); if(view.matCat===id){ const left=state.catalog[state.activeSiteId]; view.matCat=left[0]?left[0].id:null; } saveState(); renderMat(); }
+function delCat(id){ const cats=catalogStore(); const c=cats.find(x=>x.id===id); if(!c)return; if(!confirm('刪除分類「'+c.name+'」？底下所有品項與已填數量都會移除。'))return; const m=matStore(); c.items.forEach(it=>{ delete m.items[it.name]; }); const names=new Set(c.items.map(it=>it.name)); state.matTx[state.activeSiteId]=matTxStore().filter(t=>!names.has(t.item)); state.catalog[state.activeSiteId]=cats.filter(x=>x.id!==id); if(view.matCat===id){ const left=state.catalog[state.activeSiteId]; view.matCat=left[0]?left[0].id:null; } saveState(); renderMat(); renderDay(); renderCalendar(); }
 function moveCat(id,dir){ const cats=catalogStore(); const i=cats.findIndex(c=>c.id===id); const j=i+dir; if(i<0||j<0||j>=cats.length)return; [cats[i],cats[j]]=[cats[j],cats[i]]; saveState(); renderMat(); }
 
 /* 品項管理 */
@@ -1227,8 +1230,8 @@ function addItemPrompt(catId){
 }
 function addItem(catId){ const name=(document.getElementById('itName').value||'').trim(); if(!name)return toast('請輸入名稱'); if(nameExists(name))return toast('已有同名品項'); const c=catalogStore().find(x=>x.id===catId); if(!c)return; const unit=document.getElementById('itUnit').value; const pb=parseFloat(document.getElementById('itPerBox').value)||null; c.items.push({id:uid(),name,unit,perBox:pb,presets:[]}); saveState(); closeModal(); renderMat(); }
 function renameItemPrompt(name){ openModal(`<h3>品項改名 <span class="x" onclick="closeModal()">×</span></h3><label class="fld"><span>品項名稱</span><input class="inp" id="itNewName" value="${esc(name)}"></label><button class="btn full" onclick="renameItem('${esc(name)}')">儲存</button>`); }
-function renameItem(oldName){ const n=(document.getElementById('itNewName').value||'').trim(); if(!n)return toast('請輸入名稱'); if(n!==oldName && nameExists(n))return toast('已有同名品項'); const f=findCatItem(oldName); if(f){ f.item.name=n; const m=matStore(); if(m.items[oldName]){ m.items[n]=m.items[oldName]; delete m.items[oldName]; } matTxStore().forEach(t=>{ if(t.item===oldName) t.item=n; }); ordStore().forEach(o=>(o.lines||[]).forEach(l=>{ if(l.name===oldName) l.name=n; })); } saveState(); closeModal(); renderMat(); }
-function delItem(name){ if(!confirm('刪除品項「'+name+'」？已填數量與進出紀錄都會移除。'))return; const f=findCatItem(name); if(f){ f.cat.items=f.cat.items.filter(i=>i.name!==name); } delete matStore().items[name]; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.item!==name); saveState(); renderMat(); }
+function renameItem(oldName){ const n=(document.getElementById('itNewName').value||'').trim(); if(!n)return toast('請輸入名稱'); if(n!==oldName && nameExists(n))return toast('已有同名品項'); const f=findCatItem(oldName); if(f){ f.item.name=n; const m=matStore(); if(m.items[oldName]){ m.items[n]=m.items[oldName]; delete m.items[oldName]; } matTxStore().forEach(t=>{ if(t.item===oldName) t.item=n; }); ordStore().forEach(o=>(o.lines||[]).forEach(l=>{ if(l.name===oldName) l.name=n; })); } saveState(); closeModal(); renderMat(); renderDay(); renderCalendar(); }
+function delItem(name){ if(!confirm('刪除品項「'+name+'」？已填數量與進出紀錄都會移除。'))return; const f=findCatItem(name); if(f){ f.cat.items=f.cat.items.filter(i=>i.name!==name); } delete matStore().items[name]; state.matTx[state.activeSiteId]=matTxStore().filter(t=>t.item!==name); saveState(); renderMat(); renderDay(); renderCalendar(); }
 function moveItem(name,dir){ const f=findCatItem(name); if(!f)return; const arr=f.cat.items; const i=arr.findIndex(x=>x.name===name); const j=i+dir; if(j<0||j>=arr.length)return; [arr[i],arr[j]]=[arr[j],arr[i]]; saveState(); renderMat(); }
 
 /* 長按改名 + 拖曳排序（材料分類/品項，事件委派，只綁一次） */
@@ -1401,14 +1404,17 @@ function renderMatSummary(){
     let rows='';
     c.items.forEach(it=>{
       const txs=itemTxs(it.name); if(!txs.length) return;
-      const inSum=f2(txs.filter(t=>t.type==='in').reduce((a,t)=>a+(+t.qty||0),0));
-      const outSum=f2(txs.filter(t=>t.type==='out').reduce((a,t)=>a+(+t.qty||0),0));
-      const retSum=f2(txs.filter(t=>t.type==='ret').reduce((a,t)=>a+(+t.qty||0),0));
-      const bal=f2(inSum-outSum-retSum); const unit=getMatDef(it.name).unit||'';
-      rows+=`<div class="sum-row" onclick="openMatDetail('${esc(it.name)}')">
-        <span class="sum-name">${esc(it.name)}</span>
-        <span class="sum-nums">進${inSum} 用${outSum}${(+retSum)>0?' 退'+retSum:''} <b>剩${bal}</b><small>${esc(unit)}</small></span>
-      </div>`;
+      const unit=getMatDef(it.name).unit||'';
+      const specs=[], map={};
+      txs.forEach(t=>{ const k=(t.spec||'').trim(); if(!(k in map)){ map[k]={in:0,out:0,ret:0}; specs.push(k); } map[k][t.type]=(map[k][t.type]||0)+(+t.qty||0); });
+      const nums=g=>{ const bal=f2(g.in-g.out-g.ret); return `進${f2(g.in)} 用${f2(g.out)}${g.ret>0?' 退'+f2(g.ret):''} <b>剩${bal}</b><small>${esc(unit)}</small>`; };
+      if(specs.length===1 && specs[0]===''){
+        rows+=`<div class="sum-row" onclick="openMatDetail('${esc(it.name)}')"><span class="sum-name">${esc(it.name)}</span><span class="sum-nums">${nums(map[''])}</span></div>`;
+      } else {
+        let sr='';
+        specs.forEach(k=>{ sr+=`<div class="sum-row sum-spec" onclick="openMatDetail('${esc(it.name)}')"><span class="sum-name">${k?esc(k):'（未分規格）'}</span><span class="sum-nums">${nums(map[k])}</span></div>`; });
+        rows+=`<div class="sum-item" onclick="openMatDetail('${esc(it.name)}')">${esc(it.name)}</div>${sr}`;
+      }
     });
     if(rows) html+=`<div class="sum-cat">${esc(c.name)}</div>${rows}`;
   });
