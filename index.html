@@ -689,7 +689,7 @@ function migrateState(s){
   }
   return s;
 }
-function saveState(){ localStorage.setItem('wm_state', JSON.stringify(state)); markChanged(); }
+function saveState(){ try{ localStorage.setItem('wm_state', JSON.stringify(state)); markChanged(); }catch(e){ toast('⚠️ 儲存失敗（空間不足），請立即到設定備份資料'); } }
 function activeSite(){ return state.sites.find(s=>s.id===state.activeSiteId) || state.sites[0]; }
 function getCoeffs(){ return state.calcCoeffs || DEFAULT_COEFFS; }
 function markChanged(){ try{ localStorage.setItem('wm_lastChange', Date.now()); }catch(e){} }
@@ -792,6 +792,7 @@ function delSiteById(id){
   ['labor','matTx','orders','catalog','photoRecs','reportHead'].forEach(k=>{ if(state[k]) delete state[k][id]; });
   state.attendance=(state.attendance||[]).map(a=>({...a, sites:(a.sites||[]).filter(x=>x!==id)})).filter(a=>(a.sites||[]).length);
   if(state.activeSiteId===id) state.activeSiteId=(state.sites.find(x=>!x.archived)||state.sites[0]).id;
+  const act=state.sites.find(s=>s.id===state.activeSiteId); if(act&&act.archived){ act.archived=false; }
   saveState(); renderAll(); openSiteManage();
 }
 
@@ -1307,7 +1308,7 @@ function renderMat(){
   const shown = q ? cats : cats.filter(c=>c.id===view.matCat);
   shown.forEach(c=>{
     let rowsHtml='';
-    c.items.forEach(it=>{ if(q && !it.name.includes(q)) return; rowsHtml += view.matEdit ? matEditRow(it.name) : matCleanRow(it.name); });
+    c.items.forEach(it=>{ if(q && !it.name.toLowerCase().includes(q.toLowerCase())) return; rowsHtml += view.matEdit ? matEditRow(it.name) : matCleanRow(it.name); });
     if(q && !rowsHtml) return;
     if(q) html+=`<div class="mat-cat-head">${esc(c.name)}</div>`;
     html+=rowsHtml;
@@ -1640,7 +1641,7 @@ function lbPhotos(l){ return l.photoIds || (l.photoId?[l.photoId]:[]); }
 function openLaborForm(id){
   const editing=id?laborStore().find(l=>l.id===id):null;
   _labor = editing
-    ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||LABOR_TRADES[0], source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', editId:id }
+    ? { id:editing.id, siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:editing.date, trade:editing.trade||(tradeList()[0]||''), source:editing.source||'', count:(editing.count===0?0:(editing.count||'')), reason:editing.reason||'', editId:id }
     : { siteId:state.activeSiteId, origSiteId:state.activeSiteId, date:view.selDate||todayStr(), trade:(tradeList()[0]||''), source:'', count:'', reason:'', editId:null };
   _laborOrigPhotoIds = editing ? lbPhotos(editing).slice() : [];
   _laborPhotos = [];
@@ -1680,6 +1681,7 @@ function renderLaborPhotos(){ const el=document.getElementById('laborPhotoStrip'
 async function addLaborPhotos(files){ for(const f of [...files]){ const blob=await normalizeImage(f); _laborPhotos.push({id:uid(), blob, url:URL.createObjectURL(blob)}); } renderLaborPhotos(); }
 function removeLaborPhoto(i){ const p=_laborPhotos[i]; if(p&&p.url)URL.revokeObjectURL(p.url); _laborPhotos.splice(i,1); renderLaborPhotos(); }
 async function saveLabor(){
+  if(!_labor.trade && !_labor.reason) return toast('請至少填工種或工作內容');
   const target=_labor.siteId||state.activeSiteId;
   for(const p of _laborPhotos){ if(p.blob){ try{ await photoPut(p.id,p.blob,{date:_labor.date}); }catch(e){} } }
   const photoIds=_laborPhotos.map(p=>p.id);
@@ -1824,7 +1826,7 @@ function toggleFloorC(f){ view.floorCollapsed[f]=!view.floorCollapsed[f]; render
 /* 進度歷程卡（唯讀；歷程由日誌記錄當天%推算） */
 function progHistory(id){
   const map={};
-  recStore().forEach(r=>{ (r.items||[]).forEach(it=>{ if(it.progressId===id && it.percent!=null) map[r.date]=Math.max(0,Math.min(100,+it.percent||0)); }); });
+  recStore().forEach(r=>{ (r.items||[]).forEach(it=>{ if(it.progressId===id && it.percent!=null){ const v=Math.max(0,Math.min(100,+it.percent||0)); map[r.date]=Math.max(map[r.date]||0, v); } }); });
   return Object.keys(map).sort((a,b)=> a<b?-1:1).map(d=>({date:d, percent:map[d]}));
 }
 function mdLabel(ds){ const p=String(ds).split('-'); return (+p[1])+'/'+(+p[2]); }
@@ -1913,6 +1915,10 @@ function exportCSV(){
     (r.items||[]).forEach(it=>{ const p=((state.progress||{})[sid]||[]).find(x=>x.id===it.progressId)||{}; row([r.date, r.vendor, p.work||'', p.floor||'', it.headcount===0?0:(it.headcount||''), itPct(it,p)]); });
   });
   L.push('');
+  L.push('出勤'); row(['日期','出工案場']);
+  (state.attendance||[]).filter(a=>inMonth(a.date)&&(a.sites||[]).includes(sid)).sort((a,b)=>a.date<b.date?-1:1)
+    .forEach(a=>row([a.date,(a.sites||[]).map(x=>{const s=state.sites.find(y=>y.id===x);return s?s.name:'';}).filter(Boolean).join('、')]));
+  L.push('');
   L.push('點工'); row(['日期','工種','廠商','人數','工作內容']);
   ((state.labor||{})[sid]||[]).filter(l=>inMonth(l.date)).sort((a,b)=>a.date<b.date?-1:1).forEach(l=>row([l.date, l.trade, l.source, l.count===0?0:(l.count||''), l.reason||'']));
   L.push('');
@@ -1981,6 +1987,11 @@ function registerSW(){
 
 /* =================== init =================== */
 function renderAll(){ renderSiteChips(); renderCalendar(); renderDay(); renderProg(); renderMat(); renderPhotoRecs(); renderLabor(); }
+function maybeBackupNag(){
+  if(!localStorage.getItem('wm_welcomed')) return;
+  const ch=+localStorage.getItem('wm_lastChange')||0, bk=+localStorage.getItem('wm_lastBackup')||0;
+  if(ch>bk && Date.now()-bk>7*86400000) toast('⚠️ 已超過 7 天未備份，建議到設定備份');
+}
 function maybeWelcome(){
   if(localStorage.getItem('wm_welcomed')) return;
   openModal(`<h3>歡迎使用 泰郡工務系統 👷</h3>
@@ -1997,7 +2008,7 @@ function maybeWelcome(){
     <button class="btn full" style="margin-top:14px" onclick="dismissWelcome()">開始使用</button>`);
 }
 function dismissWelcome(){ localStorage.setItem('wm_welcomed','1'); closeModal(); }
-function init(){ applyTheme(); setupPWA(); registerSW(); matPointerInit(); renderAll(); maybeWelcome(); }
+function init(){ applyTheme(); setupPWA(); registerSW(); matPointerInit(); renderAll(); maybeWelcome(); maybeBackupNag(); }
 init();
 </script>
 </body>
